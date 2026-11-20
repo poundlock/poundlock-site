@@ -42,6 +42,24 @@ function expect(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+// 把过闸那一节滚到它滚动范围的某个比例（0 是画面刚停住，1 是马上要放开）。
+function scrollLockTo(page, fraction) {
+  return page.evaluate((f) => {
+    document.documentElement.style.scrollBehavior = 'auto';
+    const track = document.querySelector('[data-lock-track]');
+    const top = track.getBoundingClientRect().top + window.scrollY;
+    const range = track.offsetHeight - window.innerHeight;
+    window.scrollTo(0, Math.round(top + range * f));
+  }, fraction);
+}
+
+async function expectStagesVisible(page, t) {
+  for (const stage of Object.values(t.lock.stages)) {
+    const visible = await page.locator('[data-stage]').getByText(stage.name, { exact: true }).first().isVisible();
+    expect(visible, `阶段「${stage.name}」看不见`);
+  }
+}
+
 // 每条核对：{ name, viewports?（默认全部）, context?（给 newContext 的额外选项）, stars?（'ok' | 'fail'）, run(env) }
 // env = { page, url, lang, viewport, engine, shot(name), t（这门语言的文案）, expect }
 export const CHECKS = [
@@ -121,6 +139,131 @@ export const CHECKS = [
       expect(state.reduced && !state.ok, `html 的类不对：${JSON.stringify(state)}`);
       expect(state.water === 'static', `水面的 data-mode 是 ${state.water}`);
       await shot('top');
+    },
+  },
+  {
+    // 过闸：滚到这一节滚动范围的几个位置，拍数对得上。
+    name: 'lock-beats',
+    async run({ page, url, shot }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
+      // 取每一拍里面一点的位置，不取正好在两拍交界上的（滚动位置是整数像素，交界上会四舍五入到前一拍）。
+      // 0.955 是水面正退到一半的时候，顺带截一张。
+      const expected = { 0: '0', 0.28: '2', 0.53: '4', 0.78: '6', 0.955: '7', 1: '7' };
+      for (const [fraction, beat] of Object.entries(expected)) {
+        await scrollLockTo(page, Number(fraction));
+        await page.waitForTimeout(1100);
+        const got = await page.getAttribute('[data-lock]', 'data-beat');
+        expect(got === beat, `滚到 ${fraction} 时 data-beat 是 ${got}，应当是 ${beat}`);
+        await shot(`p${Math.round(Number(fraction) * 100)}`);
+      }
+    },
+  },
+  {
+    // 在过闸中间刷新：场景停在对应的那一拍。
+    name: 'lock-reload',
+    viewports: ['1440', '360'],
+    async run({ page, url }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
+      await scrollLockTo(page, 0.6);
+      await page.waitForTimeout(300);
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
+      await page.waitForTimeout(600);
+      const state = await page.evaluate(() => ({
+        beat: document.querySelector('[data-lock]').dataset.beat,
+        rise: Number(getComputedStyle(document.documentElement).getPropertyValue('--rise')),
+      }));
+      expect(state.beat === '4', `刷新后 data-beat 是 ${state.beat}，应当是 4`);
+      expect(state.rise > 0.5 && state.rise < 0.7, `刷新后 --rise 是 ${state.rise}`);
+    },
+  },
+  {
+    // 带着锚点直接进到后面的节：过闸算已经走完。
+    name: 'lock-hash',
+    viewports: ['1440'],
+    async run({ page, url }) {
+      await page.goto(`${url}#install`, { waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
+      await page.waitForTimeout(600);
+      const rise = await page.evaluate(() => Number(getComputedStyle(document.documentElement).getPropertyValue('--rise')));
+      expect(rise === 1, `从 #install 进来时 --rise 是 ${rise}`);
+    },
+  },
+  {
+    // 滚到一半改窗口大小：不溢出，重新滚到一半还是第五拍。
+    name: 'lock-resize',
+    viewports: ['1440'],
+    async run({ page, url }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
+      for (const size of [{ width: 1440, height: 900 }, { width: 820, height: 1180 }, { width: 360, height: 740 }]) {
+        await page.setViewportSize(size);
+        await scrollLockTo(page, 0.53);
+        // 无头的 WebKit 出帧很慢（一秒一两帧），所以等到拍数对上为止，最多等 4 秒，不用固定的等待。
+        await page
+          .waitForFunction(() => document.querySelector('[data-lock]').dataset.beat === '4', null, { timeout: 4000, polling: 100 })
+          .catch(() => {});
+        const state = await page.evaluate(() => ({
+          beat: document.querySelector('[data-lock]').dataset.beat,
+          y: Math.round(window.scrollY),
+          progress: document.querySelector('[data-lock]').style.getPropertyValue('--lock-progress'),
+          overflow: document.documentElement.scrollWidth > window.innerWidth,
+        }));
+        expect(state.beat === '4', `${size.width} 宽时 data-beat 是 ${state.beat}（scrollY ${state.y}，--lock-progress ${state.progress}）`);
+        expect(!state.overflow, `${size.width} 宽时横向溢出`);
+      }
+    },
+  },
+  {
+    // 减少动效：这一节是静态的，八个阶段都看得见。
+    name: 'lock-reduced',
+    viewports: ['1440', '360'],
+    context: { reducedMotion: 'reduce' },
+    async run({ page, url, t, shot }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForTimeout(400);
+      const position = await page.evaluate(() => getComputedStyle(document.querySelector('.lock__stage')).position);
+      expect(position !== 'sticky', `减少动效时 .lock__stage 的 position 是 ${position}`);
+      await expectStagesVisible(page, t);
+      await page.evaluate(() => document.getElementById('lock').scrollIntoView());
+      await shot('static');
+    },
+  },
+  {
+    // 禁用脚本：八个阶段、十个角色都读得到。
+    name: 'lock-nojs',
+    viewports: ['1440'],
+    context: { javaScriptEnabled: false },
+    async run({ page, url, t }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await expectStagesVisible(page, t);
+      for (const role of Object.values(t.lock.roles)) {
+        // 只看清单里带 data-role 的那些（水面以上那一层是装饰用的副本，静态版式里不显示）。
+        const chip = page.locator('[data-role], [data-role-node]').filter({ hasText: role.name }).first();
+        expect(await chip.isVisible(), `角色「${role.name}」看不见`);
+      }
+    },
+  },
+  {
+    // 过闸的模块坏了（一导入就抛错）：别的照常，这一节还读得通。
+    name: 'lock-broken',
+    viewports: ['1440'],
+    async setup({ context }) {
+      await context.route('**/scripts/lock.js', (route) =>
+        route.fulfill({ status: 200, contentType: 'text/javascript', body: 'throw new Error("故意弄坏的 lock.js");' }),
+      );
+    },
+    async run({ page, url, t, uncaught }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForFunction(() => [...document.querySelectorAll('[data-star-count]')].every((el) => !el.hidden), null, { timeout: 5000 });
+      await page.waitForTimeout(500);
+      expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
+      // 模块没起来时，这一节停在第一拍的样子：第一段的名字看得见，其余的在 HTML 里。
+      expect(await page.getByText(t.lock.stages.S1.name, { exact: true }).first().isVisible(), '第一段的名字看不见');
+      const html = await page.content();
+      for (const stage of Object.values(t.lock.stages)) expect(html.includes(stage.name), `HTML 里没有「${stage.name}」`);
     },
   },
   {

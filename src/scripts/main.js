@@ -27,7 +27,7 @@ if (header) {
 }
 
 // [模块, 导出的初始化函数, 它要的根元素]。anime 是 null 时（减少动效，或者动效库没加载出来），各模块自己走静态的那一路。
-const FEATURES = [];
+const FEATURES = [['./lock.js', 'initLock', '[data-lock]']];
 
 async function start(path, init, selector, anime) {
   const element = document.querySelector(selector);

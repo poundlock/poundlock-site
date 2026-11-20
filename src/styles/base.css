@@ -247,8 +247,10 @@ button {
   transform: translateY(-50%);
 }
 
+/* 平滑滚动只给页面里点出来的跳转（这时页面上有元素拿着焦点）。
+   带着锚点打开页面时不平滑：不然浏览器会从页顶一路滚过整页，包括过闸那一段。 */
 @media (prefers-reduced-motion: no-preference) {
-  html {
+  html:focus-within {
     scroll-behavior: smooth;
   }
 }

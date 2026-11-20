@@ -57,7 +57,7 @@ for (const code of ['zh', 'en']) {
     assert.equal(count(text, ' data-attempt="'), 6);
     assert.equal(count(text, ' data-gate="'), 6);
     assert.equal(count(text, ' data-role-node="'), 10);
-    assert.equal(count(text, ' data-lock'), 1);
+    assert.equal((text.match(/\sdata-lock(?=[\s>])/g) ?? []).length, 1);
     assert.equal(count(text, ' data-breach-out'), 1);
     assert.equal(count(text, ' data-breach-all'), 1);
     assert.equal(count(text, ' data-copy-source'), count(text, ' data-copy '), '复制源和复制按钮要成对');
