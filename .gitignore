@@ -1,0 +1,11 @@
+# wellyard:gitignore v3 sha256:241cb3f819c82f7840f4f103689cfbd5f5382aa71e5871253dc96b9d1746a57e
+# 密钥：.env 一律不进仓库，.env.example 除外
+.env
+.env.*
+!.env.example
+# 本机的 Claude Code 设置
+/.claude/settings.local.json
+# 系统生成的文件
+.DS_Store
+Thumbs.db
+# /wellyard:gitignore

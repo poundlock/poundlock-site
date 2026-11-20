@@ -1,0 +1,5 @@
+# wellyard:gitattributes v1 sha256:04401d9959676ad5700325859a056586cbc04444de787745faf124edc364d22f
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+# /wellyard:gitattributes
