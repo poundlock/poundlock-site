@@ -34,6 +34,7 @@ function parseArgs(argv) {
     else if (argv[i] === '--only') args.only = argv[++i].split(',');
     else if (argv[i] === '--out') args.out = argv[++i];
     else if (argv[i] === '--perf') args.perf = true;
+    else if (argv[i] === '--record') args.record = true;
   }
   return args;
 }
@@ -453,6 +454,78 @@ async function perf(playwright, baseUrl) {
   }
 }
 
+// --record：录两段中文页的录屏（桌面 1440×900、手机 390×844），从页顶匀速滚到闯闸，再点两种办法。
+// 用本机的 Chrome 有头模式录，水面才是显卡画的。录好的 webm 在 <out>/checkpoint/ 下。
+async function record(playwright, baseUrl, outDir) {
+  const dir = path.join(outDir, 'checkpoint');
+  await mkdir(dir, { recursive: true });
+  const sizes = [
+    { name: 'desktop', width: 1440, height: 900 },
+    { name: 'phone', width: 390, height: 844 },
+  ];
+  const browser = await playwright.chromium.launch({ channel: 'chrome', headless: false });
+  const saved = [];
+  try {
+    for (const size of sizes) {
+      const context = await browser.newContext({
+        viewport: { width: size.width, height: size.height },
+        recordVideo: { dir, size: { width: size.width, height: size.height } },
+      });
+      await context.route('https://api.github.com/**', (route) =>
+        route.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"Not Found"}' }),
+      );
+      const page = await context.newPage();
+      await page.goto(baseUrl, { waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
+      await page.waitForTimeout(3600);
+      // 匀速滚：先到过闸那一节的顶，再慢慢滚过它，最后到闯闸。
+      const glide = (toSelector, edge, durationMs) =>
+        page.evaluate(
+          ({ selector, where, ms }) =>
+            new Promise((resolve) => {
+              document.documentElement.style.scrollBehavior = 'auto';
+              const el = document.querySelector(selector);
+              const rect = el.getBoundingClientRect();
+              const target = window.scrollY + (where === 'bottom' ? rect.bottom - window.innerHeight : rect.top);
+              const from = window.scrollY;
+              const start = performance.now();
+              const step = (now) => {
+                const k = Math.min(1, (now - start) / ms);
+                window.scrollTo(0, from + (target - from) * k);
+                if (k < 1) requestAnimationFrame(step);
+                else resolve();
+              };
+              requestAnimationFrame(step);
+            }),
+          { selector: toSelector, where: edge, ms: durationMs },
+        );
+      await glide('#pain', 'top', 1600);
+      await page.waitForTimeout(1200);
+      await glide('[data-lock-track]', 'top', 1800);
+      await page.waitForTimeout(600);
+      await glide('[data-lock-track]', 'bottom', 17000);
+      await page.waitForTimeout(1400);
+      await glide('#breach', 'top', 1500);
+      await page.waitForTimeout(900);
+      for (const id of ['skip-level', 'claim-done']) {
+        const button = page.locator(`button[data-attempt="${id}"]`);
+        await button.scrollIntoViewIfNeeded();
+        await button.click();
+        await page.waitForTimeout(2200);
+      }
+      const video = page.video();
+      await context.close();
+      const target = path.join(dir, `poundlock-${size.name}.webm`);
+      await video.saveAs(target);
+      await video.delete().catch(() => {});
+      saved.push(target);
+    }
+  } finally {
+    await browser.close();
+  }
+  return saved;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   let playwright;
@@ -471,6 +544,17 @@ async function main() {
 
   const server = await startServer({ port: 0, dir: 'dist' });
   const baseUrl = `http://127.0.0.1:${server.address().port}/`;
+  if (args.record) {
+    let saved = [];
+    try {
+      saved = await record(playwright, baseUrl, outDir);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+    for (const file of saved) console.log(`录屏：${file}`);
+    process.exit(saved.length === 2 ? 0 : 1);
+  }
+
   if (args.perf) {
     let ok = false;
     try {

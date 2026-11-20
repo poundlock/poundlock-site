@@ -1,0 +1,56 @@
+/* 痛点：三句 AI 常说的话，各配一句实际发生的事。篇幅小，是给过闸铺垫的。
+   上面那句是「它说的」，画成一片浅水色的话；下面那句是「实际上」，前面一道闸缝。 */
+
+.pain {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-7);
+}
+
+.pain .section__title {
+  max-width: var(--measure);
+  font-size: clamp(var(--text-5), 3vw, var(--text-6));
+  color: var(--muted);
+}
+
+.pain__list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-6) var(--space-5);
+  margin-top: var(--space-6);
+}
+
+.pain__item {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--space-3);
+}
+
+.pain__claim {
+  padding: 0.6em 1.05em;
+  border-radius: var(--radius-m) var(--radius-m) var(--radius-m) 4px;
+  font-size: var(--text-4);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--deep-1);
+  background: linear-gradient(180deg, var(--water-hi-0), var(--mint-hi));
+}
+
+.pain__truth {
+  padding-left: var(--space-3);
+  border-left: 4px solid var(--line);
+  font-size: var(--text-3);
+  line-height: 1.6;
+  color: var(--fg);
+}
+
+@media (max-width: 820px) {
+  .pain__list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+
+  .pain__claim {
+    font-size: var(--text-3);
+  }
+}

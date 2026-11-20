@@ -244,7 +244,8 @@
 /* 水从上往下退：水这一层不挪位置，只是从上往下被裁掉，底下那张浅色的图就在原地露出来。
    --surface 由 lock.js 写在 .lock__stage 上，0 是水满着，1 是退完了。 */
 .js.motion-ok .lock__water {
-  background: linear-gradient(180deg, #0E5560 0%, var(--deep-1) 46%);
+  /* 最上面一行和上一节的底色一样，画面滚进来的时候不留一道边；亮的那一带在偏上的位置。 */
+  background: linear-gradient(180deg, var(--deep-1) 0%, #0D4E5A 26%, var(--deep-1) 72%);
   clip-path: inset(calc(var(--surface, 0) * (100% + 48px)) 0 0 0);
   will-change: clip-path;
 }
