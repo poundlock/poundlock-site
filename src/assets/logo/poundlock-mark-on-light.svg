@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="96 56 320 400" width="320" height="400" role="img" aria-label="poundlock">
+  <!-- 梯级，只有图形、透明底：放在浅色背景上。 -->
+  <defs>
+    <linearGradient id="pl-lo" gradientUnits="userSpaceOnUse" x1="0" y1="146" x2="0" y2="446"><stop offset="0" stop-color="#49B6A4"/><stop offset="1" stop-color="#23877E"/></linearGradient>
+    <linearGradient id="pl-mid" gradientUnits="userSpaceOnUse" x1="0" y1="106" x2="0" y2="406"><stop offset="0" stop-color="#3A9AA6"/><stop offset="1" stop-color="#226F86"/></linearGradient>
+    <linearGradient id="pl-hi" gradientUnits="userSpaceOnUse" x1="0" y1="66" x2="0" y2="366"><stop offset="0" stop-color="#2B7AAB"/><stop offset="1" stop-color="#17507C"/></linearGradient>
+  </defs>
+  <path d="M199 157.25A150 150 0 0 0 199 434.75Z" fill="url(#pl-lo)"/>
+  <path d="M213 112.3A150 150 0 0 1 299 112.3V399.7A150 150 0 0 1 213 399.7Z" fill="url(#pl-mid)"/>
+  <path d="M313 77.25A150 150 0 0 1 313 354.75Z" fill="url(#pl-hi)"/>
+</svg>

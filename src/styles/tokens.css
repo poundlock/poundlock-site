@@ -1,0 +1,103 @@
+/* 色、字、间距的变量。各节的样式只用这里的名字。
+   原始色出自图标「梯级」的两版配色（主仓库 design/logo/README.md）。 */
+
+:root {
+  /* 深色版：底、光、三片水 */
+  --deep-0: #11606A;
+  --deep-1: #08323F;
+  --glow: #7FE7D6;
+  --water-hi-0: #FFFFFF;
+  --mint-hi: #D3F6EC;
+  --water-mid-0: #9AF0DD;
+  --mint-mid: #4FD0BB;
+  --water-lo-0: #3CC4B0;
+  --mint-lo: #128C84;
+
+  /* 浅色版：底、三片水 */
+  --paper-0: #F8F4EB;
+  --paper-1: #EAE3D5;
+  --blue-hi-0: #2B7AAB;
+  --blue-hi: #17507C;
+  --blue-mid-0: #3A9AA6;
+  --blue-mid: #226F86;
+  --blue-lo-0: #49B6A4;
+  --blue-lo: #23877E;
+
+  /* 字标的两种颜色 */
+  --ink: #13212B;
+  --snow: #F0F6FC;
+
+  /* 字 */
+  --font-sans: "PL Sans", "PL SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-display: var(--font-sans);
+  --font-gauge: "PL Condensed", "PL Sans", sans-serif;
+  --font-mono: "PL Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  /* 字号阶梯：14 16 18 21 24 36 48 60 72 */
+  --text-1: 0.875rem;
+  --text-2: 1rem;
+  --text-3: 1.125rem;
+  --text-4: 1.3125rem;
+  --text-5: 1.5rem;
+  --text-6: 2.25rem;
+  --text-7: 3rem;
+  --text-8: 3.75rem;
+  --text-9: 4.5rem;
+
+  /* 间距 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+  --space-7: 72px;
+  --space-8: 112px;
+
+  /* 圆角：小控件、面板（就是闸缝的宽度）、胶囊 */
+  --radius-s: 6px;
+  --radius-m: 14px;
+  --radius-l: 999px;
+
+  /* 闸缝 */
+  --slit: 14px;
+
+  /* 版面 */
+  --page-pad: clamp(20px, 5vw, 72px);
+  --page-max: 1200px;
+  --measure: 40em;
+
+  /* 动效：水慢，闸快 */
+  --ease-water: cubic-bezier(0.16, 0.84, 0.3, 1);
+  --ease-gate: cubic-bezier(0.34, 1.4, 0.5, 1);
+  --time-water: 900ms;
+  --time-gate: 320ms;
+
+  /* 过闸的全局进度，0 到 1，由 lock.js 写 */
+  --rise: 0;
+}
+
+/* 按 zone 切换的语义色。直接写色值，不引用别的变量：对比度的测试要读它们。 */
+[data-zone="deep"] {
+  --bg: #08323F;
+  --fg: #F0F6FC;
+  --muted: #C2E2DD;
+  --accent: #7FE7D6;
+  --line: #2C7480;
+}
+
+[data-zone="rise"] {
+  --bg: #08323F;
+  --fg: #F0F6FC;
+  --muted: #C2E2DD;
+  --accent: #7FE7D6;
+  --line: #2C7480;
+}
+
+[data-zone="light"] {
+  --bg: #F8F4EB;
+  --fg: #13212B;
+  --muted: #4A5B63;
+  --accent: #17507C;
+  --line: #D5CCBA;
+}

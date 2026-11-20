@@ -1,0 +1,104 @@
+/* 页头。没有脚本时它跟着页面滚走；有脚本时固定在顶上，底色和字色跟着 --rise 从深到浅。 */
+
+.site-header {
+  --header-ink: color-mix(in srgb, var(--snow), var(--ink) calc(var(--rise) * 100%));
+  --header-ground: color-mix(in srgb, var(--deep-1), var(--paper-0) calc(var(--rise) * 100%));
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: 64px;
+  padding-inline: max(var(--page-pad), calc((100vw - var(--page-max)) / 2));
+  color: var(--header-ink);
+}
+
+.js .site-header {
+  position: fixed;
+}
+
+/* 离开页顶以后才垫上底色，首屏的水面不被挡住。 */
+.site-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--header-ground);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--header-ink) 14%, transparent);
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+
+.site-header[data-scrolled="true"]::before {
+  opacity: 0.94;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand__mark {
+  width: 30px;
+  height: 30px;
+}
+
+.brand__name {
+  display: block;
+  height: 19px;
+  width: auto;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-2);
+}
+
+.lang-switch {
+  padding: 6px 10px;
+  border-radius: var(--radius-l);
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.86;
+}
+
+.lang-switch:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.star-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 40px;
+  padding: 0.3em 1em;
+  border-radius: var(--radius-l);
+  color: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--header-ink) 32%, transparent) inset;
+  transition: box-shadow 200ms ease;
+}
+
+.star-link:hover {
+  box-shadow: 0 0 0 1.5px var(--header-ink) inset;
+}
+
+@media (max-width: 420px) {
+  .site-header {
+    height: 56px;
+  }
+
+  .star-link {
+    padding-inline: 0.8em;
+  }
+}
