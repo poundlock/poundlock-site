@@ -1,0 +1,139 @@
+{
+  "meta": {
+    "title": "poundlock: ten roles finish your requirement, in order",
+    "description": "poundlock is a Claude Code plugin. You talk to one project manager; ten roles take your requirement through eight stages, and six gates check that each step is really done."
+  },
+  "nav": {
+    "star": "Star",
+    "skip": "Skip to content"
+  },
+  "hero": {
+    "h1": "Ten roles finish your requirement, in order.",
+    "sub": "poundlock is a Claude Code plugin. You talk to one project manager; whether each step is really done is checked by gates, not claimed by the AI.",
+    "ctaStar": "Star on GitHub",
+    "ctaDemo": "Watch a run",
+    "note": "The plugin itself runs in Chinese."
+  },
+  "pain": {
+    "title": "Three things that happen when the AI just writes",
+    "items": [
+      { "claim": "“All done. Tests pass.”", "truth": "The tests never ran. It only said so." },
+      { "claim": "“This step isn’t important. Skipping it.”", "truth": "The step it skipped was the design, or the tests." },
+      { "claim": "“Built exactly as you asked.”", "truth": "What it built is no longer what your words asked for." }
+    ]
+  },
+  "lock": {
+    "title": "One requirement, eight locks",
+    "lead": "A pound lock is a canal lock: the boat enters the chamber, the gate closes behind it, the water rises one level, and only then can it move on. Until a stage has handed over everything it owes, the next gate stays shut.",
+    "ledgerTitle": "What each stage leaves behind",
+    "parallelNote": "Roles in the same stage work in parallel",
+    "stages": {
+      "S1": { "name": "Contract", "line": "Your words are frozen word for word. Every later step is checked against them." },
+      "S2": { "name": "Product design", "line": "Product settles what to build, for whom, and what counts as done. UI writes the interaction and visual spec." },
+      "S3": { "name": "Technical plan", "line": "The architect fixes the plan and the interfaces, and says where every file goes." },
+      "S4": { "name": "Dispatch decision", "line": "The project manager decides which roles this run needs and which it leaves out." },
+      "S5": { "name": "Implementation", "line": "The architect hands the work to each platform. Every new behavior comes with an automated test." },
+      "S6": { "name": "Testing", "line": "The testing role runs tests and never writes them. Missing tests fail the stage." },
+      "S7": { "name": "Business acceptance", "line": "The result is checked against your words, clause by clause. Code style is not the question." },
+      "S8": { "name": "Delivery", "line": "The project manager writes the delivery report and the run is closed." }
+    },
+    "roles": {
+      "pm": { "name": "Project manager", "job": "The only role you talk to. It takes the requirement from intake to delivery, dispatching layer by layer and checking each stage." },
+      "product": { "name": "Product", "job": "Turns the contract into a product definition: what to build, for whom, what counts as done." },
+      "ui": { "name": "UI", "job": "Writes the interaction and visual spec, then builds it in the implementation stage." },
+      "architect": { "name": "Architect", "job": "Turns the product definition into a technical plan and interface contracts, then hands the work to the implementers." },
+      "backend": { "name": "Backend", "job": "Writes the server side to the plan and the interface contracts, and runs it to verify." },
+      "frontend": { "name": "Frontend", "job": "Writes the front end to the plan and the interface contracts, and runs it to verify." },
+      "ios": { "name": "iOS", "job": "Writes the iOS app to the plan and the interface contracts, and runs it to verify." },
+      "android": { "name": "Android", "job": "Writes the Android app to the plan and the interface contracts, and runs it to verify." },
+      "qa": { "name": "Testing role", "job": "Runs the existing tests and reviews this run’s changes. It does not change implementation code." },
+      "acceptance": { "name": "Acceptance role", "job": "Checks the result against the contract, clause by clause. It does not build and does not change code." }
+    }
+  },
+  "breach": {
+    "title": "Want to cut a corner? Try it.",
+    "lead": "Here are six common shortcuts. Pick one and watch the gate close.",
+    "demoBadge": "Demo: a replay of the plugin’s real behavior, not a live run. The real messages are in Chinese.",
+    "allTried": "All six gates are code that blocks the call, not a line in a prompt asking the AI to behave.",
+    "attempts": {
+      "skip-level": {
+        "label": "The project manager hands work straight to backend",
+        "says": "The project manager may not dispatch to backend. Backend is dispatched by the architect: to get it working, dispatch the architect. Do not go around the roster."
+      },
+      "no-test-report": {
+        "label": "Send in acceptance before the test report exists",
+        "says": "Business acceptance is S7, and a deliverable it depends on is still missing: 06-test.md. Finish the stage that produces it first. Do not skip."
+      },
+      "cross-dir": {
+        "label": "Backend edits the front-end directory on the side",
+        "says": "Backend may not write this file: the path is not one it claimed. If it really has to be written, report it upward and let the project manager decide who gets it."
+      },
+      "edit-contract": {
+        "label": "Backend rewrites the requirement in the contract",
+        "says": "May not write 00-contract.md. The contract is this run’s only requirement baseline: only the user changes it, through the project manager. If the contract looks wrong, report it upward. Do not edit it yourself."
+      },
+      "claim-done": {
+        "label": "Say “done” without handing over the deliverable",
+        "says": "You cannot stop yet: the implementation record this stage owes is still missing. Write it, then stop. If you truly cannot, start your reply with the report-upward mark and say what is missing."
+      },
+      "fourth-rework": {
+        "label": "Three rework rounds failed, so start a fourth",
+        "says": "This stage has used up its rework budget (3 rounds). Ask the user first: it goes ahead only if the user approves one more round. Otherwise, stop."
+      }
+    },
+    "gates": {
+      "dispatch": { "name": "Dispatch whitelist", "what": "Who may dispatch whom follows the roster. Skipping a level is refused." },
+      "readiness": { "name": "Readiness", "what": "Until the previous stage has handed everything over, nobody can be sent into the next." },
+      "writepath": { "name": "Write-path isolation", "what": "Each role writes only inside the directories assigned to it." },
+      "contract": { "name": "Contract protection", "what": "Only you change your words. No role can touch them." },
+      "deliverable": { "name": "Deliverable checks", "what": "A role cannot stop while the deliverable it owes is missing." },
+      "budget": { "name": "Rework budget", "what": "Three rework rounds at most. After that it has to ask you." }
+    }
+  },
+  "contract": {
+    "title": "Acceptance checks against your own words",
+    "lead": "Every sentence you write after /poundlock:at goes into the contract word for word. Beyond testing, a separate acceptance pass checks the result against it, clause by clause.",
+    "wordsLabel": "Your words (example)",
+    "words": "Build a small expense tracker: record an expense, see a monthly summary, export a CSV.",
+    "reworkNote": "One clause failed, so the run goes back to implementation for rework. After rework, the test, acceptance and delivery reports are all produced anew.",
+    "clauses": [
+      { "quote": "record an expense", "note": "Pass: it can be entered and saved." },
+      { "quote": "see a monthly summary", "note": "Pass: the monthly totals add up." },
+      { "quote": "export a CSV", "note": "Fail: there is no way to export on the page." }
+    ]
+  },
+  "roster": {
+    "title": "Ten roles, one stage each",
+    "lead": "The project manager dispatches product, the architect, the testing role and the acceptance role. Product dispatches UI. The architect dispatches backend, frontend, UI, iOS and Android. Who may dispatch whom is written in the roster and checked by a gate.",
+    "youTalkTo": "You talk to the project manager only"
+  },
+  "limits": {
+    "title": "What it is not",
+    "lead": "Know these before you install.",
+    "more": "The full list of known limitations is in the README",
+    "items": [
+      { "head": "Not a sandbox", "body": "The gates govern the order of dispatch, file writes and delivery. Roles keep Bash to build and test, and the command line is outside the gates." },
+      { "head": "It takes over this project’s main session", "body": "Once installed, the main session of every new session in this project is the project manager. That is why the install command carries --scope local: it applies to this one project only." },
+      { "head": "It runs in Chinese", "body": "Role prompts, deliverable templates and gate messages are all Chinese, and the gates recognise a few Chinese option labels verbatim." },
+      { "head": "Requirements", "body": "Claude Code 2.1.276 or later. Node 16.9 or later, on the PATH that Claude Code starts with. On native Windows, Git for Windows as well." }
+    ]
+  },
+  "install": {
+    "title": "Two commands to install",
+    "lead": "Run these in the project directory you want the team to work in:",
+    "scopeWarning": "Do not drop --scope local from the install command: without it, every new session on this machine, in every project, starts as the project manager.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFallback": "Selected. Copy it by hand.",
+    "firstRunTitle": "First run",
+    "firstRunSteps": ["Once per project: it surveys the project and writes the project config.", "Put your requirement after it to start a run."],
+    "more": "Update, uninstall and the other commands are in the README"
+  },
+  "footer": {
+    "closing": "If this approach makes sense to you, give it a star.",
+    "repo": "GitHub repository",
+    "readme": "README",
+    "changelog": "Changelog",
+    "license": "MIT license"
+  }
+}

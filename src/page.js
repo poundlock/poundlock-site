@@ -1,4 +1,14 @@
 import { html } from './lib/html.js';
+import * as header from './sections/header.js';
+import * as hero from './sections/hero.js';
+import * as pain from './sections/pain.js';
+import * as lock from './sections/lock.js';
+import * as breach from './sections/breach.js';
+import * as contract from './sections/contract.js';
+import * as roster from './sections/roster.js';
+import * as limits from './sections/limits.js';
+import * as install from './sections/install.js';
+import * as footer from './sections/footer.js';
 
 // ctx = { lang, t, base, config, version }
 //   lang    config.langs 里的一项
@@ -33,13 +43,20 @@ ${config.langs.map((l) => html`<link rel="alternate" hreflang="${l.htmlLang}" hr
 </head>`;
 }
 
+// <main> 里各节的次序。页头和页尾在 <main> 外面。
+const SECTIONS = [hero, pain, lock, breach, contract, roster, limits, install];
+
 export function renderPage(ctx) {
   const { lang, config } = ctx;
   return String(html`<!doctype html>
 <html lang="${lang.htmlLang}" data-repo-api="${config.repoApi}">
 ${head(ctx)}
 <body>
-<main id="main"></main>
+${header.render(ctx)}
+<main id="main">
+${SECTIONS.map((section) => html`${section.render(ctx)}
+`)}</main>
+${footer.render(ctx)}
 </body>
 </html>
 `);

@@ -23,9 +23,7 @@ const COPIES = [
 ];
 
 async function loadCopy(code) {
-  const file = path.join(SRC, 'copy', `${code}.json`);
-  if (!existsSync(file)) return { meta: { title: 'poundlock', description: 'poundlock' } };
-  return JSON.parse(await readFile(file, 'utf8'));
+  return JSON.parse(await readFile(path.join(SRC, 'copy', `${code}.json`), 'utf8'));
 }
 
 export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version = 'dev', commit = '' } = {}) {
