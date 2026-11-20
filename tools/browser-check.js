@@ -267,6 +267,78 @@ export const CHECKS = [
     },
   },
   {
+    // 闯闸：六个办法挨个点，每点一个，右边换成那道门禁说的话，对应的门禁亮起来；六个点完出收尾那句。
+    name: 'breach-click',
+    viewports: ['1440', '360'],
+    async run({ page, url, t, shot }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('#breach[data-breach-live]', { timeout: 8000 });
+      expect(!(await page.isVisible('[data-breach-all]')), '还没点就显示了收尾那句');
+      const attempts = await page.$$eval('button[data-attempt]', (els) => els.map((el) => ({ id: el.dataset.attempt, gate: el.dataset.gateRef })));
+      expect(attempts.length === 6, `办法有 ${attempts.length} 个`);
+      let lit = 0;
+      for (const attempt of attempts) {
+        await page.click(`button[data-attempt="${attempt.id}"]`);
+        await page.waitForTimeout(250);
+        lit++;
+        const state = await page.evaluate(() => ({
+          out: document.querySelector('[data-breach-out]').textContent,
+          lit: document.querySelectorAll('[data-gate][data-lit]').length,
+        }));
+        expect(state.out.includes(t.breach.gates[attempt.gate].name), `点了 ${attempt.id}，右边没有出现「${t.breach.gates[attempt.gate].name}」`);
+        expect(state.out.includes(t.breach.attempts[attempt.id].says), `点了 ${attempt.id}，右边不是它那句话`);
+        expect(state.lit === lit, `点了 ${lit} 个，亮着的门禁是 ${state.lit} 个`);
+        if (lit === 3) await shot('mid');
+      }
+      expect(await page.isVisible('[data-breach-all]'), '六个都点完了，收尾那句没出来');
+      await page.waitForTimeout(900);
+      await shot('done');
+    },
+  },
+  {
+    // 只用键盘：Tab 到办法上按 Enter，结果一样；焦点看得见。
+    name: 'breach-keys',
+    viewports: ['1440'],
+    async run({ page, url, t }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('#breach[data-breach-live]', { timeout: 8000 });
+      await page.focus('button[data-attempt]');
+      for (let i = 0; i < 6; i++) {
+        const focus = await page.evaluate(() => {
+          const el = document.activeElement;
+          const style = getComputedStyle(el);
+          return { attempt: el.dataset.attempt, outline: style.outlineStyle, width: parseFloat(style.outlineWidth) };
+        });
+        expect(Boolean(focus.attempt), `第 ${i + 1} 次 Tab 之后焦点不在办法上`);
+        expect(focus.outline !== 'none' && focus.width >= 2, `焦点样式看不见：${JSON.stringify(focus)}`);
+        await page.keyboard.press('Enter');
+        await page.keyboard.press('Tab');
+      }
+      await page.waitForTimeout(200);
+      expect((await page.locator('[data-gate][data-lit]').count()) === 6, '键盘走完，亮着的门禁不是 6 个');
+      expect(await page.isVisible('[data-breach-all]'), '键盘走完，收尾那句没出来');
+      expect((await page.textContent('[data-breach-out]')).length > 0, '右边是空的');
+      void t;
+    },
+  },
+  {
+    // 减少动效：点了直接是关上的样子，话照样出来。
+    name: 'breach-reduced',
+    viewports: ['1440'],
+    context: { reducedMotion: 'reduce' },
+    async run({ page, url, t }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('#breach[data-breach-live]', { timeout: 8000 });
+      await page.click('button[data-attempt="edit-contract"]');
+      const state = await page.evaluate(() => ({
+        out: document.querySelector('[data-breach-out]').textContent,
+        closed: document.querySelector('.breach__svg').dataset.closed,
+      }));
+      expect(state.out.includes(t.breach.gates.contract.name), '减少动效时点了没有出话');
+      expect(state.closed === 'true', '减少动效时闸门没有直接关上');
+    },
+  },
+  {
     name: 'shots',
     async run({ page, url, shot }) {
       await page.goto(url, { waitUntil: 'load' });
