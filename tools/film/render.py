@@ -4,6 +4,7 @@
 #
 # 选项：--size 1920x1080  --samples 256  --only 3,7（只渲染这几帧）  --quality 0|1|2（石头的细致程度）
 #       --cam "x,y,z,tx,ty,tz"（不用影片的镜头，自己摆，查场景用）  --lens 27  --blend 文件（把场景存下来）
+#       --resume 1（已经渲染出来的帧跳过：中途断了接着渲）
 import json
 import math
 import os
@@ -26,7 +27,7 @@ JOURNEY_SECONDS = 96.0  # 整段路按这么长的时间算水面的波动
 
 def options():
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
-    opts = {"size": "1280x720", "samples": "128", "quality": "2", "only": "", "cam": "", "lens": "", "blend": "", "states": "", "out": ""}
+    opts = {"size": "1280x720", "samples": "128", "quality": "2", "only": "", "cam": "", "lens": "", "blend": "", "states": "", "out": "", "resume": "", "grass": "1"}
     for key, value in zip(argv[0::2], argv[1::2]):
         opts[key.lstrip("-")] = value
     return opts
@@ -167,11 +168,11 @@ def make_jets(mats):
     return jets
 
 
-def build(scene, quality):
+def build(scene, quality, with_grass=True):
     mats = make_materials()
     terrains = masonry.build(mats, quality)
     greens.forest(mats, masonry.SEEDS)
-    if quality > 0:
+    if quality > 0 and with_grass:
         greens.grass(terrains, mats)
     props.fence(mats)
     props.ladders(mats)
@@ -194,9 +195,18 @@ def smoothstep(x):
     return x * x * (3 - 2 * x)
 
 
+DAWN_FROM = 0.875  # 最后一拍（进最高一级）开始天亮
+LIFT_FROM = 0.93  # 从这里起镜头往上升
+
+
 def sky_time(state):
-    """天色走到哪了：一路上从深夜慢慢到天快亮，驶出最高一级时日出。"""
-    return min(1.0, 0.6 * smoothstep(state["progress"] / 0.94) + 0.4 * state["day"])
+    """天色走到哪了（0 深夜，0.6 蓝调时刻，1 日出）：前七拍从深夜慢慢到天快亮；
+    最后一整拍天亮起来——船在最高一级里升上去的时候天边发白，驶出去的时候太阳升起来。
+    页面上「天亮了」的那一刻（lock-film.js 的 DAY_AT）是照着这里定的，改这里要一起改。"""
+    p = state["progress"]
+    if p <= DAWN_FROM:
+        return 0.6 * (p / DAWN_FROM) ** 1.3
+    return 0.6 + 0.4 * smoothstep((p - DAWN_FROM) / (1.0 - DAWN_FROM))
 
 
 def camera_pose(state):
@@ -204,10 +214,10 @@ def camera_pose(state):
     u = state["progress"] * lay.N
     bx = state["boat"] * lay.L
     bz = state["level"] * lay.R
-    end = state["day"]
+    end = smoothstep((state["progress"] - LIFT_FROM) / (1.0 - LIFT_FROM))
     drift = 1.2 * math.sin(u * 0.62 + 0.4)
-    back = 11.8 - 1.0 * math.cos(u * 0.5) + 5.0 * end
-    height = 5.3 + 0.4 * math.sin(u * 0.45 + 2.0) + 3.5 * end
+    back = 10.6 - 1.0 * math.cos(u * 0.5) + 5.0 * end
+    height = 5.9 + 0.3 * math.sin(u * 0.45 + 2.0) + 3.5 * end
     position = (bx - back, drift, bz + height)
     target = (bx + 9.0 + 30.0 * end, -drift * 0.35, bz + 1.3 + 1.5 * end)
     focus = (bx, 0.0, bz + 1.0)
@@ -256,7 +266,7 @@ def main():
     width, height = (int(v) for v in opts["size"].lower().split("x"))
     world.render_settings(scene, width, height, int(opts["samples"]))
     started = time.time()
-    built = build(scene, int(opts["quality"]))
+    built = build(scene, int(opts["quality"]), opts["grass"] != "0")
     print(f"[film] 场景搭好了，用了 {time.time() - started:.1f} 秒，{len(bpy.data.objects)} 个物体", flush=True)
 
     with open(opts["states"], encoding="utf-8") as handle:
@@ -266,6 +276,9 @@ def main():
     saved = False
     for state in states:
         if only is not None and state["index"] not in only:
+            continue
+        done = os.path.join(os.path.abspath(opts["out"]), f"f{state['index']:04d}.png")
+        if opts["resume"] and os.path.exists(done) and os.path.getsize(done) > 50_000:
             continue
         apply(scene, built, state)
         position, target, focus = camera_pose(state)

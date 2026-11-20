@@ -22,11 +22,18 @@ const COPIES = [
   ['assets', ''],
 ];
 
+// 影片的清单（tools/film/encode.mjs 写的）。影片还没渲染出来时没有这个文件，页面就不带影片。
+async function loadFilm() {
+  const file = path.join(SRC, 'assets', 'film', 'manifest.json');
+  return existsSync(file) ? JSON.parse(await readFile(file, 'utf8')) : null;
+}
+
 async function loadCopy(code) {
   return JSON.parse(await readFile(path.join(SRC, 'copy', `${code}.json`), 'utf8'));
 }
 
-export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version = 'dev', commit = '' } = {}) {
+// film：不传就读 src/assets/film/manifest.json；传 null 是有意不带影片。
+export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version = 'dev', commit = '', film } = {}) {
   const out = path.resolve(ROOT, outDir);
   const assets = path.join(out, 'assets');
   await mkdir(assets, { recursive: true });
@@ -39,6 +46,7 @@ export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version
     if (existsSync(source)) await cp(source, path.join(assets, to), { recursive: true });
   }
 
+  const filmManifest = film === undefined ? await loadFilm() : film;
   const pages = [];
   for (const lang of config.langs) {
     const ctx = {
@@ -47,6 +55,7 @@ export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version
       base: lang.path ? '../'.repeat(lang.path.split('/').filter(Boolean).length) : '',
       config: { ...config, siteUrl },
       version,
+      film: filmManifest,
     };
     const dir = path.join(out, lang.path);
     await mkdir(dir, { recursive: true });

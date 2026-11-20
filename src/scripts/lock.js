@@ -1,10 +1,11 @@
 // 过闸：画面停在视口里，滚动推进，八拍，对应 S1 到 S8。
 // 默认的版式是静态的（八个阶段的清单加一张升满了的图）；这里只在系统没要求减少动效时接管。
-// 接管以后有两种画法：先试三维的（lock3d.js，要 WebGL）；起不来，就用平面的那张图（要动效库）。
+// 接管以后有两种画法：先用影片（lock-film.js：离线渲染好的一串画面，滚到哪画哪一帧）；
+// 页面没带影片、访客开了省流量、画面下不来，就用平面的那张图（要动效库）。
 // beatAt、progressOf 是纯函数，Node 里能直接测。
 
 import { lockStateAt } from './lock-state.js';
-import { createFpsWatchdog } from './motion.js';
+import { mountFilm } from './lock-film.js';
 
 export function beatAt(progress, beats = 8) {
   const p = Math.min(1, Math.max(0, progress));
@@ -20,38 +21,15 @@ export function progressOf(rect, viewportHeight) {
 
 const BEATS = 8;
 
-// 三维的画法。画面跟着滚动位置走，带一点惯性，不是一格一格跳。
-async function mountSpace(root, canvas) {
-  const { mountLock3D } = await import('./lock3d.js');
-  const space = mountLock3D(root, canvas);
-  const layer = root.querySelector('[data-lock-water]');
-  let shown = null;
-  let last = null;
-  return {
-    kind: 'space',
-    // snap：不带惯性，直接到位。
-    frame(progress, now, snap = false) {
-      // 第一帧直接到位（刷新、带锚点进来时不从头演一遍）；之后带着惯性追。
-      const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
-      last = now;
-      shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * 7));
-      const state = lockStateAt(shown, BEATS);
-      space.frame(state, now / 1000);
-      // 天亮以后，压在画面上的字换成浅色段的颜色。
-      const day = state.day > 0.5;
-      root.toggleAttribute('data-day', day);
-      if (layer) layer.classList.toggle('on-light', day);
-      // 页头固定在最上面，压着这块画面：天亮了它也换成浅色。
-      root.ownerDocument.documentElement.style.setProperty('--header-day', day ? '1' : '0');
-    },
-    lowerQuality: () => space.lowerQuality(),
-    destroy() {
-      space.destroy();
-      root.ownerDocument.documentElement.style.removeProperty('--header-day');
-      root.removeAttribute('data-day');
-      if (layer) layer.classList.remove('on-light');
-    },
-  };
+// 画布上带着影片的清单（生成页面时写进去的）；没带、或者写坏了，就是没有影片。
+function readFilm(canvas) {
+  if (!canvas || !canvas.dataset.film) return null;
+  try {
+    const film = JSON.parse(canvas.dataset.film);
+    return film && film.sets && Object.keys(film.sets).length ? film : null;
+  } catch {
+    return null;
+  }
 }
 
 // 平面的画法：那张八片的图。动效库的时间线管每一拍里各个动作的缓动，走到哪由滚动进度定。
@@ -126,7 +104,7 @@ function mountFlat(root, anime) {
   // 收尾：水从上往下退，底下那张浅色的图在原地露出来。
   timeline.add(state, { surface: [0, 1], duration: 480, ease: 'inOutQuad' }, BEATS * BEAT - 480);
 
-  // 和三维的那一版一样：第一帧直接到位，之后带着惯性追滚动位置。
+  // 和影片那一版一样：第一帧直接到位，之后带着惯性追滚动位置。
   let shown = null;
   let last = null;
   return {
@@ -168,57 +146,48 @@ export function initLock(root, anime, { reduced = false } = {}) {
     shownBeat = beat;
     root.dataset.beat = String(beat);
     chambers.forEach((chamber, i) => chamber.toggleAttribute('data-current', i === beat));
-    tags.forEach((tag) => tag.toggleAttribute('data-in', Number(tag.dataset.ledgerBeat) <= beat));
-  };
-
-  // 画面（三维的，或者平面的）等快滚到这一节了才去加载：三维的库很大，页面一打开就加载它，
-  // 会让首屏卡一下——出过一次事：首屏的水面因此被当成「设备画不动」关掉了。
-  let scene = null;
-  let mounting = false;
-  let strikes = 0;
-  let watchdog = null;
-
-  // 三维的画不动时：先降清晰度；还不行，换成平面的。
-  const watch = () => {
-    watchdog = createFpsWatchdog({
-      minFps: 30,
-      onDegrade: () => {
-        strikes++;
-        if (!scene || scene.kind !== 'space') return;
-        if (strikes === 1) {
-          scene.lowerQuality();
-          watch();
-        } else if (anime) {
-          scene.destroy();
-          root.removeAttribute('data-lock-3d');
-          scene = mountFlat(root, anime);
-          if (scene) root.dataset.lockScene = scene.kind;
-        }
-      },
+    // data-in：已经落下的产物；data-now：这一拍刚落下的（手机上放不下全部，只显示这些）。
+    tags.forEach((tag) => {
+      const at = Number(tag.dataset.ledgerBeat);
+      tag.toggleAttribute('data-in', at <= beat);
+      tag.toggleAttribute('data-now', at === beat);
     });
   };
 
-  const mount = async () => {
-    if (scene || mounting) return;
-    mounting = true;
-    let mounted = null;
-    if (canvas) {
-      try {
-        root.setAttribute('data-lock-3d', 'true');
-        mounted = await mountSpace(root, canvas);
-      } catch (error) {
-        root.removeAttribute('data-lock-3d');
-        console.warn('[poundlock] 三维的过闸没起来，改用平面的。', error);
-      }
-    }
-    if (!mounted && anime) mounted = mountFlat(root, anime);
-    mounting = false;
-    if (!mounted) return;
+  // 画面（影片，或者平面的那张图）等快滚到这一节了才去加载：影片有一两百张图，不跟首屏抢带宽和帧。
+  let scene = null;
+  const film = readFilm(canvas);
+  const saveData = Boolean(win.navigator.connection && win.navigator.connection.saveData);
+
+  const show = (mounted) => {
     scene = mounted;
+    if (!scene) {
+      delete root.dataset.lockScene;
+      return;
+    }
     root.dataset.lockScene = scene.kind;
-    if (scene.kind === 'space') watch();
     apply();
     scene.frame(progress, win.performance.now(), true);
+  };
+
+  // 影片一帧都下不来：收起画布，换成平面的那张图。
+  const toFlat = () => {
+    if (scene) scene.destroy();
+    root.removeAttribute('data-lock-film');
+    show(anime ? mountFlat(root, anime) : null);
+  };
+
+  const mount = () => {
+    if (scene) return;
+    let mounted = null;
+    if (film && !saveData) {
+      // 先标上，画布才显示出来、量得到大小。
+      root.setAttribute('data-lock-film', '');
+      mounted = mountFilm(root, canvas, film, { onFail: toFlat });
+      if (!mounted) root.removeAttribute('data-lock-film');
+    }
+    if (!mounted && anime) mounted = mountFlat(root, anime);
+    show(mounted);
   };
 
   // 这一节在视口里的时候每帧做两件事：读一次滚动位置（不单靠 scroll 事件——有的浏览器在惯性滚动、
@@ -228,7 +197,6 @@ export function initLock(root, anime, { reduced = false } = {}) {
   const loop = (now) => {
     apply();
     if (scene) scene.frame(progress, now);
-    if (watchdog && scene && scene.kind === 'space') watchdog.tick();
     frame = inView ? win.requestAnimationFrame(loop) : 0;
   };
   const observer = new win.IntersectionObserver((entries) => {
@@ -265,11 +233,10 @@ export function initLock(root, anime, { reduced = false } = {}) {
       observer.disconnect();
       nearby.disconnect();
       if (frame) win.cancelAnimationFrame(frame);
-      if (watchdog) watchdog.stop();
       if (scene) scene.destroy();
       delete root.dataset.lockLive;
       delete root.dataset.lockScene;
-      root.removeAttribute('data-lock-3d');
+      root.removeAttribute('data-lock-film');
     },
   };
 }

@@ -449,50 +449,85 @@
   }
 }
 
-/* ---------- 三维的过闸（lock.js 起得来三维的那一版时，在这一节上标 data-lock-3d） ---------- */
+/* ---------- 影片版的过闸（lock.js 接上影片时，在这一节上标 data-lock-film） ---------- */
 
 .lock__canvas {
   display: none;
 }
 
-.js.motion-ok .lock[data-lock-3d] .lock__canvas {
+.js.motion-ok .lock[data-lock-film] .lock__canvas {
   display: block;
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  /* 画面的中心（船和它前面的闸门）落在画布的哪：左边要让给字，所以往右挪。lock-film.js 读这两个数。 */
+  --film-x: 0.61;
+  --film-y: 0.5;
+  /* 第一帧到了再显出来，不闪一下空画布。 */
+  opacity: 0;
+  transition: opacity 600ms ease;
 }
 
-/* 平面那张图用的东西都收起来：水面以上那一层、那道波、图本身。图的位置留着，三维的景从那里透出来。 */
-.js.motion-ok .lock[data-lock-3d] .lock__air,
-.js.motion-ok .lock[data-lock-3d] .lock__wave {
+.js.motion-ok .lock[data-lock-film][data-lock-film-ready] .lock__canvas {
+  opacity: 1;
+}
+
+/* 平面那张图用的东西都收起来：水面以上那一层、那道波、图本身。图的位置留着，影片从那里透出来。 */
+.js.motion-ok .lock[data-lock-film] .lock__air,
+.js.motion-ok .lock[data-lock-film] .lock__wave {
   display: none;
 }
 
-.js.motion-ok .lock[data-lock-3d] .lock__scene {
+.js.motion-ok .lock[data-lock-film] .lock__scene {
   visibility: hidden;
 }
 
-.js.motion-ok .lock[data-lock-3d] .lock__stage {
+.js.motion-ok .lock[data-lock-film] .lock__stage {
   background: var(--bg);
 }
 
-/* 字压在画面上：左边和底下各垫一层往画面里淡出去的底色，字才读得清。天亮以后这一层换成浅色。 */
-.js.motion-ok .lock[data-lock-3d] .lock__water {
+/* 字压在画面上：左边和底下各垫一层往画面里淡出去的暗色，字才读得清。
+   画面两侧一直是暗的（夜里是岸，天亮了是逆光的树林），所以字从头到尾用浅色，不跟着天亮换。
+   快到头的时候字淡出去，让位给下面那层升上来的亮色。 */
+.js.motion-ok .lock[data-lock-film] .lock__water {
   clip-path: none;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--bg) 86%, transparent) 0%, color-mix(in srgb, var(--bg) 60%, transparent) 30%, transparent 56%),
-    linear-gradient(0deg, color-mix(in srgb, var(--bg) 88%, transparent) 0%, transparent 30%);
-  transition: color 500ms ease;
+    linear-gradient(90deg, color-mix(in srgb, var(--shade) 84%, transparent) 0%, color-mix(in srgb, var(--shade) 58%, transparent) 30%, transparent 58%),
+    linear-gradient(0deg, color-mix(in srgb, var(--shade) 90%, transparent) 0%, transparent 32%);
+  opacity: clamp(0, calc((0.985 - var(--lock-progress, 0)) * 30), 1);
+}
+
+/* 收尾：一层和下一节同色的亮从底下漫上来，画面滚走的时候不是一刀切。 */
+.js.motion-ok .lock[data-lock-film] .lock__stage::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 55%;
+  background: linear-gradient(0deg, var(--zl-bg) 0%, color-mix(in srgb, var(--zl-bg) 70%, transparent) 30%, transparent 100%);
+  opacity: clamp(0, calc((var(--lock-progress, 0) - 0.95) * 22), 1);
+  pointer-events: none;
 }
 
 @media (max-width: 767px) {
-  /* 窄屏上景在上、字在下：底色从下往上淡出去。 */
-  .js.motion-ok .lock[data-lock-3d] .lock__water {
-    background: linear-gradient(0deg, color-mix(in srgb, var(--bg) 94%, transparent) 0%, color-mix(in srgb, var(--bg) 80%, transparent) 46%, transparent 64%);
+  /* 窄屏上画面在上、字在下：画布只占上面一截，底下往暗色里淡出去。 */
+  .js.motion-ok .lock[data-lock-film] .lock__canvas {
+    inset: 0 0 auto 0;
+    height: 60svh;
+    --film-x: 0.5;
+    --film-y: 0.4;
   }
 
-  .js.motion-ok .lock[data-lock-3d] .lock__scene {
-    height: 38svh;
+  .js.motion-ok .lock[data-lock-film] .lock__water {
+    background: linear-gradient(0deg, var(--bg) 0%, var(--bg) 40%, color-mix(in srgb, var(--bg) 72%, transparent) 48%, transparent 62%);
+  }
+
+  .js.motion-ok .lock[data-lock-film] .lock__scene {
+    height: 40svh;
+  }
+
+  /* 一路攒下来的产物有十几件，手机上放不下：只显示这一段刚落下的。 */
+  .js.motion-ok .lock[data-lock-film] .lock__tag:not([data-now]) {
+    display: none;
   }
 }

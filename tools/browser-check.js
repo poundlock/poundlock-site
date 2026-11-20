@@ -189,9 +189,8 @@ export const CHECKS = [
     },
   },
   {
-    // 三维的过闸起来了：有 WebGL 的浏览器里，画布在画，平面那张图收起来了，天亮以后字换成深色。
-    name: 'lock-3d',
-    engines: ['chromium'],
+    // 影片版的过闸：画布上画着东西，滚到哪画哪一帧；横屏用横版、竖屏用竖版；平面那张图收起来；滚到头天亮。
+    name: 'lock-film',
     viewports: ['1440', '360'],
     async run({ page, url, shot, uncaught }) {
       await page.goto(url, { waitUntil: 'load' });
@@ -200,39 +199,78 @@ export const CHECKS = [
         page.evaluate(() => {
           const root = document.querySelector('[data-lock]');
           const canvas = root.querySelector('[data-lock-canvas]');
+          const set = JSON.parse(canvas.dataset.film).sets[canvas.dataset.filmSet];
+          // 画布上取一小块算平均亮度：画上了东西就不是 0。
+          const pixels = canvas.getContext('2d').getImageData(Math.floor(canvas.width * 0.45), Math.floor(canvas.height * 0.35), 32, 32).data;
+          let sum = 0;
+          for (let i = 0; i < pixels.length; i += 4) sum += pixels[i] + pixels[i + 1] + pixels[i + 2];
           return {
-            space: root.hasAttribute('data-lock-3d'),
-            canvas: getComputedStyle(canvas).display,
-            width: canvas.width,
+            film: root.hasAttribute('data-lock-film'),
+            display: getComputedStyle(canvas).display,
+            opacity: Number(getComputedStyle(canvas).opacity),
+            set: canvas.dataset.filmSet,
+            frame: Number(canvas.dataset.frame),
+            count: set ? set.count : 0,
+            lit: sum / (32 * 32 * 3),
             flat: getComputedStyle(root.querySelector('.lock__water .lock__scene')).visibility,
             day: root.hasAttribute('data-day'),
+            wide: innerWidth >= innerHeight,
+            // 当前这一段的说明压到底下的产物清单上多少像素（不压是负数或 0）。
+            overlap: root.querySelector('.lock__water .chamber[data-current]').getBoundingClientRect().bottom - root.querySelector('.lock__water .lock__ledger').getBoundingClientRect().top,
           };
         });
+      // 等画面追到进度 fraction 对应的那一帧（这一带的帧要先下完，惯性要追上）。
+      const settle = (fraction) =>
+        page
+          .waitForFunction(
+            (f) => {
+              const canvas = document.querySelector('[data-lock-canvas]');
+              const set = JSON.parse(canvas.dataset.film).sets[canvas.dataset.filmSet];
+              return set && Math.abs(Number(canvas.dataset.frame) - Math.round(f * (set.count - 1))) <= 1;
+            },
+            fraction,
+            { timeout: 25000, polling: 200 },
+          )
+          .catch(() => {});
       await scrollLockTo(page, 0.3);
-      // 画面是快滚到时才加载的：等它挂上。
-      await page.waitForSelector('[data-lock][data-lock-scene]', { timeout: 15000 });
-      await page.waitForTimeout(1200);
+      // 画面是快滚到时才加载的：等它挂上、第一帧画出来。
+      await page.waitForSelector('[data-lock][data-lock-scene="film"][data-lock-film-ready]', { timeout: 25000 });
+      await settle(0.3);
+      await page.waitForTimeout(800);
       let s = await state();
-      expect(s.space, '三维的过闸没起来');
-      expect(s.canvas === 'block' && s.width > 0, `画布没在画：${JSON.stringify(s)}`);
-      expect(s.flat === 'hidden', '三维起来了，平面那张图却没收起来');
+      expect(s.film, '影片版的过闸没起来');
+      expect(s.display === 'block' && s.opacity > 0.9, `画布没显示出来：${JSON.stringify(s)}`);
+      expect(s.set === (s.wide ? 'wide' : 'tall'), `视口是${s.wide ? '横' : '竖'}的，用的却是 ${s.set} 这一套`);
+      expect(Math.abs(s.frame - Math.round(0.3 * (s.count - 1))) <= 1, `滚到 0.3，画的是第 ${s.frame} 帧（共 ${s.count} 帧）`);
+      expect(s.lit > 2, `画布是黑的：${JSON.stringify(s)}`);
+      expect(s.flat === 'hidden', '影片起来了，平面那张图却没收起来');
       expect(!s.day, '才到第三拍就天亮了');
+      expect(s.overlap <= 1, `这一段的说明压到了产物清单上 ${Math.round(s.overlap)} 像素`);
       await shot('night');
-      await scrollLockTo(page, 1);
-      await page.waitForTimeout(1800);
+      // 实现那一段（S5）的说明最长：它也不能压到清单上。
+      await scrollLockTo(page, 0.56);
+      await settle(0.56);
+      await page.waitForTimeout(600);
       s = await state();
+      expect(s.overlap <= 1, `S5 的说明压到了产物清单上 ${Math.round(s.overlap)} 像素`);
+      await shot('s5');
+      await scrollLockTo(page, 1);
+      await settle(1);
+      await page.waitForTimeout(600);
+      s = await state();
+      expect(s.frame === s.count - 1, `滚到头了，画的是第 ${s.frame} 帧，不是最后一帧（${s.count - 1}）`);
       expect(s.day, '滚到头了天还没亮');
       await shot('day');
       expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
     },
   },
   {
-    // 没有 WebGL：退回平面的那张图，八拍照常走，水面照常从上往下退。
+    // 影片一帧都下不来：退回平面的那张图，八拍照常走，水面照常从上往下退。
     name: 'lock-flat',
     engines: ['chromium'],
     viewports: ['1440', '360'],
-    launch: { args: ['--disable-3d-apis'] },
     async run({ page, url, shot, uncaught }) {
+      await page.route('**/assets/film/**', (route) => route.abort());
       await page.goto(url, { waitUntil: 'load' });
       await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 15000 });
       await scrollLockTo(page, 0.53);
@@ -242,19 +280,17 @@ export const CHECKS = [
       const s = await page.evaluate(() => {
         const root = document.querySelector('[data-lock]');
         return {
-          space: root.hasAttribute('data-lock-3d'),
+          film: root.hasAttribute('data-lock-film'),
           beat: root.dataset.beat,
           flat: getComputedStyle(root.querySelector('.lock__water .lock__scene')).visibility,
           // 第四片（下标 3）这时应当已经注满：水那块矩形回到了原位。
           filled: root.querySelector('.lock__water .slab[data-slab="3"] .slab__water').style.transform,
-          water: document.querySelector('[data-water]').dataset.mode,
         };
       });
-      expect(!s.space, '没有 WebGL，却标成了三维');
+      expect(!s.film, '影片下不来，却还标着影片版');
       expect(s.beat === '4', `data-beat 是 ${s.beat}`);
       expect(s.flat === 'visible', '平面那张图没显示出来');
       expect(/translateY\(0(\.0+)?px\)/.test(s.filled), `第四片没注满：${s.filled}`);
-      expect(s.water === 'static', `首屏的水面应当是静态的，现在是 ${s.water}`);
       await shot('p53');
       expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
     },

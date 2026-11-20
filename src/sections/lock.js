@@ -43,7 +43,9 @@ function ledger(t, live) {
 }
 
 export function render(ctx) {
-  const { t } = ctx;
+  const { t, base, film } = ctx;
+  // 影片的清单：哪几套画面、各多少帧、多大。没有影片（还没渲染、或者有意不带）就不写，页面用平面的那张图。
+  const filmData = film ? JSON.stringify({ base: `${base}assets/film/`, sets: film.sets }) : null;
   const last = stages[stages.length - 1];
   const lastCopy = t.lock.stages[last.id];
   return html`<section id="lock" class="lock" data-section="lock" data-zone="rise" data-lock>
@@ -53,8 +55,8 @@ export function render(ctx) {
   </header>
   <div class="lock__track" data-lock-track>
     <div class="lock__stage">
-      <!-- 三维的过闸画在这里；没有 WebGL 时它不显示，用下面那张平面的图。 -->
-      <canvas class="lock__canvas" data-lock-canvas aria-hidden="true"></canvas>
+      <!-- 过闸的影片画在这里，滚到哪画哪一帧；没有影片时它不显示，用下面那张平面的图。 -->
+      ${filmData ? html`<canvas class="lock__canvas" data-lock-canvas data-film="${filmData}" aria-hidden="true"></canvas>` : html`<canvas class="lock__canvas" data-lock-canvas aria-hidden="true"></canvas>`}
       <!-- 水面以上：同一张图换成浅色版，停在最后一段。动效在的时候垫在水的下面，水退下去才露出来。 -->
       <div class="lock__layer lock__air on-light" aria-hidden="true">
         <div class="lock__scene">${renderScene({ tone: 'light' })}</div>

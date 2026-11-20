@@ -114,3 +114,46 @@ test('build 不删输出目录里原有的东西', async () => {
   await build({ outDir: dir, siteUrl: SITE_URL });
   assert.ok(existsSync(path.join(dir, 'keep.txt')));
 });
+
+// 过闸那一节画布上的影片清单（没有就是 null）。
+function filmOf(text) {
+  const tag = /<canvas[^>]*data-lock-canvas[^>]*>/.exec(text);
+  assert.ok(tag, '页面里没有过闸的画布');
+  const data = /data-film="([^"]*)"/.exec(tag[0]);
+  return data ? JSON.parse(data[1].replaceAll('&quot;', '"').replaceAll('&amp;', '&')) : null;
+}
+
+test('带影片：过闸的画布上写着影片的清单，地址相对各页自己', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'poundlock-site-film-'));
+  const film = { sets: { wide: { dir: 'wide', ext: 'webp', count: 240, width: 1920, height: 1080 }, tall: { dir: 'tall', ext: 'webp', count: 120, width: 1080, height: 1440 } } };
+  await build({ outDir: dir, siteUrl: SITE_URL, film });
+  for (const [file, base] of [['index.html', 'assets/film/'], ['en/index.html', '../assets/film/']]) {
+    const data = filmOf(readFileSync(path.join(dir, file), 'utf8'));
+    assert.ok(data, `${file} 的画布上没有影片清单`);
+    assert.equal(data.base, base);
+    assert.deepEqual(data.sets, film.sets);
+  }
+});
+
+test('不带影片：画布上没有清单，页面用平面的那张图', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'poundlock-site-nofilm-'));
+  await build({ outDir: dir, siteUrl: SITE_URL, film: null });
+  for (const file of ['index.html', 'en/index.html']) assert.equal(filmOf(readFileSync(path.join(dir, file), 'utf8')), null);
+});
+
+test('不指定时，带不带影片看 src/assets/film/manifest.json 在不在；在的话清单里的每一帧都在', () => {
+  const manifest = path.resolve('src', 'assets', 'film', 'manifest.json');
+  for (const page of pages) {
+    const data = filmOf(page.text);
+    if (!existsSync(manifest)) {
+      assert.equal(data, null);
+      continue;
+    }
+    assert.ok(data, `${page.file} 没带上影片`);
+    for (const set of Object.values(data.sets)) {
+      const files = readdirSync(path.join(out, 'assets', 'film', set.dir));
+      assert.equal(files.length, set.count, `${set.dir} 的帧数和清单对不上`);
+      for (let k = 0; k < set.count; k++) assert.ok(files.includes(`f${String(k).padStart(4, '0')}.${set.ext}`), `${set.dir} 缺第 ${k} 帧`);
+    }
+  }
+});

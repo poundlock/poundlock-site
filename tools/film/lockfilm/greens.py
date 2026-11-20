@@ -125,30 +125,34 @@ def forest(mats, seeds, count=3000):
     return placed
 
 
-def _clump(name, rng, blades, height, spread):
-    """一丛草：几片弯着的叶子，从根到尖越来越窄。"""
+def _patch(name, rng, blades, radius):
+    """一块草皮：一两千根弯着的草叶，中间密、边上稀，从根到尖越来越窄。
+    一块一块地摆，比一丛一丛地摆少两个数量级的物体：每一帧整理场景快得多。"""
     verts = []
     faces = []
     for _ in range(blades):
+        # 位置：圆盘里随机，边上稀一点（相邻两块搭在一起时不显出接缝）。
+        r = radius * math.sqrt(rng.random()) * (0.55 + 0.45 * rng.random())
+        at = rng.uniform(0, 2 * math.pi)
+        ox, oy = r * math.cos(at), r * math.sin(at)
         az = rng.uniform(0, 2 * math.pi)
-        lean = rng.uniform(0.05, 0.5)
-        tall = height * rng.uniform(0.5, 1.15)
-        ox, oy = rng.uniform(-spread, spread), rng.uniform(-spread, spread)
+        lean = rng.uniform(0.05, 0.55)
+        tall = rng.uniform(0.09, 0.3) * (1.4 if rng.random() < 0.08 else 1.0)
         dx, dy = math.cos(az), math.sin(az)
         sx, sy = -dy, dx
-        base_w = rng.uniform(0.007, 0.013)
+        base_w = rng.uniform(0.006, 0.012)
         first = len(verts)
         steps = 3
-        for k in range(steps + 1):
-            t = k / steps
+        for step in range(steps + 1):
+            t = step / steps
             out = tall * lean * t * t
             up = tall * (t - 0.25 * lean * t * t)
             w = base_w * (1.0 - t) ** 0.8 + 0.0008
             cx, cy = ox + dx * out, oy + dy * out
             verts.append((cx + sx * w, cy + sy * w, up))
             verts.append((cx - sx * w, cy - sy * w, up))
-        for k in range(steps):
-            a = first + k * 2
+        for step in range(steps):
+            a = first + step * 2
             faces.append((a, a + 1, a + 3, a + 2))
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(verts, [], faces)
@@ -156,12 +160,12 @@ def _clump(name, rng, blades, height, spread):
     return mesh
 
 
-def grass(terrains, mats, density=60.0):
-    """给两侧的地撒草。地形网格上的 grass（0 到 1）是这一处长多密。"""
+def grass(terrains, mats, density=0.6):
+    """给两侧的地铺草皮。地形网格上的 grass（0 到 1）是这一处长多密；density 是每平方米摆几块。"""
     rng = random.Random(5)
     sources = []
-    for v, (blades, height, spread) in enumerate(((16, 0.2, 0.1), (12, 0.3, 0.08), (20, 0.13, 0.13))):
-        mesh = _clump(f"grass{v}", rng, blades, height, spread)
+    for v, (blades, radius) in enumerate(((2200, 0.95), (1800, 0.85), (2600, 1.05))):
+        mesh = _patch(f"grass{v}", rng, blades, radius)
         obj = link(bpy.data.objects.new(f"grass{v}", mesh))
         obj.location = (0.0, 0.0, -900.0 - v)
         assign(obj, mats["grass"])
@@ -202,8 +206,8 @@ def grass(terrains, mats, density=60.0):
         links.new(euler.outputs[0], rotation.inputs[0])
         size = nodes.new("FunctionNodeRandomValue")
         size.data_type = "FLOAT"
-        size.inputs["Min"].default_value = 0.6
-        size.inputs["Max"].default_value = 1.25
+        size.inputs["Min"].default_value = 0.8
+        size.inputs["Max"].default_value = 1.2
         size.inputs["Seed"].default_value = 23 + v
         grow = nodes.new("ShaderNodeCombineXYZ")
         for axis in ("X", "Y", "Z"):
