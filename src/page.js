@@ -38,7 +38,7 @@ ${config.langs.map((l) => html`<link rel="alternate" hreflang="${l.htmlLang}" hr
 <meta name="poundlock-site-version" content="${version}">
 <link rel="icon" type="image/svg+xml" href="${base}assets/logo/poundlock-tile.svg">
 <link rel="stylesheet" href="${base}assets/site.css">
-<script>document.documentElement.classList.add('js')</script>
+<script>document.documentElement.classList.add('js',matchMedia('(prefers-reduced-motion: reduce)').matches?'motion-reduced':'motion-ok')</script>
 <script type="module" src="${base}assets/scripts/main.js"></script>
 </head>`;
 }

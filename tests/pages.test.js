@@ -44,7 +44,9 @@ for (const code of ['zh', 'en']) {
     has(facts.floors.claudeCode, 'Claude Code 的版本下限');
     has(facts.floors.node, 'Node 的版本下限');
     for (const stage of facts.stages) for (const artifact of stage.artifacts) has(artifact, '产物名');
-    has(t.hero.h1, '主标题');
+    // 主标题分成了两行，各在一个 span 里：去掉标签再比。
+    const h1 = text.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g, '');
+    assert.equal(h1, escapeHtml(t.hero.h1), '主标题');
     has(t.breach.demoBadge, '演示的标注');
   });
 
