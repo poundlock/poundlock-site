@@ -37,7 +37,7 @@ async function start(path, init, selector, anime) {
   if (!element) return;
   try {
     const module = await import(path);
-    module[init](element, anime, { reduced });
+    await module[init](element, anime, { reduced });
   } catch (error) {
     console.warn(`[poundlock] ${path} 没起来，这一块保持静态。`, error);
   }

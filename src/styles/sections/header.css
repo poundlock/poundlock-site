@@ -3,9 +3,17 @@
 .site-header {
   /* 不做渐变：过闸快结束、水面退到页头后面的那一刻（--rise 到 0.94）一下子从深换到浅。
      慢慢混的话，中间有一段字和底都是灰的，看不清。 */
-  --header-flip: clamp(0, (var(--rise) - 0.94) * 1000, 1);
+  /* 三维的过闸会直接告诉页头天亮了没有（--header-day，0 或 1）；平面的那一版没有它，就按进度算。 */
+  --header-flip: var(--header-day, clamp(0, (var(--rise) - 0.94) * 1000, 1));
   --header-ink: color-mix(in srgb, var(--zd-fg), var(--zl-fg) calc(var(--header-flip) * 100%));
   --header-ground: color-mix(in srgb, var(--zd-bg), var(--zl-bg) calc(var(--header-flip) * 100%));
+  /* 图标的三片：深色段上用水的深色版那三档，换到浅色段时一起换成浅色版。 */
+  --mark-lo-0: color-mix(in srgb, var(--water-lo-0), var(--blue-lo-0) calc(var(--header-flip) * 100%));
+  --mark-lo-1: color-mix(in srgb, var(--mint-lo), var(--blue-lo) calc(var(--header-flip) * 100%));
+  --mark-mid-0: color-mix(in srgb, var(--water-mid-0), var(--blue-mid-0) calc(var(--header-flip) * 100%));
+  --mark-mid-1: color-mix(in srgb, var(--mint-mid), var(--blue-mid) calc(var(--header-flip) * 100%));
+  --mark-hi-0: color-mix(in srgb, var(--water-hi-0), var(--blue-hi-0) calc(var(--header-flip) * 100%));
+  --mark-hi-1: color-mix(in srgb, var(--mint-hi), var(--blue-hi) calc(var(--header-flip) * 100%));
   position: absolute;
   inset: 0 0 auto 0;
   z-index: 50;
@@ -47,8 +55,8 @@
 }
 
 .brand__mark {
-  width: 30px;
-  height: 30px;
+  width: auto;
+  height: 32px;
 }
 
 .brand__name {

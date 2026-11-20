@@ -13,7 +13,7 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(ROOT, 'src');
 
 // 样式按这个次序拼成 assets/site.css（相对 src/styles/）。
-const STYLES = ['tokens.css', 'base.css', 'layout.css', 'sections/header.css', 'sections/hero.css', 'sections/pain.css', 'sections/lock.css', 'sections/breach.css', 'palettes.css'];
+const STYLES = ['tokens.css', 'base.css', 'layout.css', 'sections/header.css', 'sections/hero.css', 'sections/pain.css', 'sections/lock.css', 'sections/breach.css'];
 
 // 原样复制的目录：[src/ 下的来源, 输出里 assets/ 下的去处]。来源不在就跳过。
 const COPIES = [

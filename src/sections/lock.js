@@ -53,6 +53,8 @@ export function render(ctx) {
   </header>
   <div class="lock__track" data-lock-track>
     <div class="lock__stage">
+      <!-- 三维的过闸画在这里；没有 WebGL 时它不显示，用下面那张平面的图。 -->
+      <canvas class="lock__canvas" data-lock-canvas aria-hidden="true"></canvas>
       <!-- 水面以上：同一张图换成浅色版，停在最后一段。动效在的时候垫在水的下面，水退下去才露出来。 -->
       <div class="lock__layer lock__air on-light" aria-hidden="true">
         <div class="lock__scene">${renderScene({ tone: 'light' })}</div>

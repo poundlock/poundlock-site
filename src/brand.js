@@ -30,11 +30,26 @@ function readWordmark() {
   };
 }
 
-const mark = readWordmark();
+const outline = readWordmark();
 
 export function wordmark(className) {
   return raw(
-    `<svg class="${className}" viewBox="${mark.viewBox}" aria-hidden="true" focusable="false">` +
-      `<path transform="${mark.transform}" fill="currentColor" d="${mark.d}"/></svg>`,
+    `<svg class="${className}" viewBox="${outline.viewBox}" aria-hidden="true" focusable="false">` +
+      `<path transform="${outline.transform}" fill="currentColor" d="${outline.d}"/></svg>`,
+  );
+}
+
+// 图标「梯级」的三片，画法和 design/logo 里的一致，颜色用调色板的变量（--mark-*，页头的样式里定）。
+// 页面上的图标跟着页面的配色走；design/logo 里的文件（浏览器标签上的小图标、分享图）是定稿的品牌图，不动。
+export function mark(className) {
+  const gradient = (id, y1, y2) =>
+    `<linearGradient id="brand-${id}" gradientUnits="userSpaceOnUse" x1="0" y1="${y1}" x2="0" y2="${y2}">` +
+    `<stop offset="0" style="stop-color:var(--mark-${id}-0)"/><stop offset="1" style="stop-color:var(--mark-${id}-1)"/></linearGradient>`;
+  return raw(
+    `<svg class="${className}" viewBox="96 56 320 400" aria-hidden="true" focusable="false">` +
+      `<defs>${gradient('lo', 146, 446)}${gradient('mid', 106, 406)}${gradient('hi', 66, 366)}</defs>` +
+      '<path d="M199 157.25A150 150 0 0 0 199 434.75Z" fill="url(#brand-lo)"/>' +
+      '<path d="M213 112.3A150 150 0 0 1 299 112.3V399.7A150 150 0 0 1 213 399.7Z" fill="url(#brand-mid)"/>' +
+      '<path d="M313 77.25A150 150 0 0 1 313 354.75Z" fill="url(#brand-hi)"/></svg>',
   );
 }

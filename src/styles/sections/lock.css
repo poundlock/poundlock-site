@@ -448,3 +448,51 @@
     font-size: 0.75rem;
   }
 }
+
+/* ---------- 三维的过闸（lock.js 起得来三维的那一版时，在这一节上标 data-lock-3d） ---------- */
+
+.lock__canvas {
+  display: none;
+}
+
+.js.motion-ok .lock[data-lock-3d] .lock__canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 平面那张图用的东西都收起来：水面以上那一层、那道波、图本身。图的位置留着，三维的景从那里透出来。 */
+.js.motion-ok .lock[data-lock-3d] .lock__air,
+.js.motion-ok .lock[data-lock-3d] .lock__wave {
+  display: none;
+}
+
+.js.motion-ok .lock[data-lock-3d] .lock__scene {
+  visibility: hidden;
+}
+
+.js.motion-ok .lock[data-lock-3d] .lock__stage {
+  background: var(--bg);
+}
+
+/* 字压在画面上：左边和底下各垫一层往画面里淡出去的底色，字才读得清。天亮以后这一层换成浅色。 */
+.js.motion-ok .lock[data-lock-3d] .lock__water {
+  clip-path: none;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--bg) 86%, transparent) 0%, color-mix(in srgb, var(--bg) 60%, transparent) 30%, transparent 56%),
+    linear-gradient(0deg, color-mix(in srgb, var(--bg) 88%, transparent) 0%, transparent 30%);
+  transition: color 500ms ease;
+}
+
+@media (max-width: 767px) {
+  /* 窄屏上景在上、字在下：底色从下往上淡出去。 */
+  .js.motion-ok .lock[data-lock-3d] .lock__water {
+    background: linear-gradient(0deg, color-mix(in srgb, var(--bg) 94%, transparent) 0%, color-mix(in srgb, var(--bg) 80%, transparent) 46%, transparent 64%);
+  }
+
+  .js.motion-ok .lock[data-lock-3d] .lock__scene {
+    height: 38svh;
+  }
+}

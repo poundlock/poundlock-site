@@ -39,6 +39,8 @@ function parseArgs(argv) {
   return args;
 }
 
+const GPU_ARGS = ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu'];
+
 function expect(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -161,6 +163,74 @@ export const CHECKS = [
     },
   },
   {
+    // 三维的过闸起来了：有 WebGL 的浏览器里，画布在画，平面那张图收起来了，天亮以后字换成深色。
+    name: 'lock-3d',
+    engines: ['chromium'],
+    viewports: ['1440', '360'],
+    async run({ page, url, shot, uncaught }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 15000 });
+      const state = () =>
+        page.evaluate(() => {
+          const root = document.querySelector('[data-lock]');
+          const canvas = root.querySelector('[data-lock-canvas]');
+          return {
+            space: root.hasAttribute('data-lock-3d'),
+            canvas: getComputedStyle(canvas).display,
+            width: canvas.width,
+            flat: getComputedStyle(root.querySelector('.lock__water .lock__scene')).visibility,
+            day: root.hasAttribute('data-day'),
+          };
+        });
+      await scrollLockTo(page, 0.3);
+      await page.waitForTimeout(1200);
+      let s = await state();
+      expect(s.space, '三维的过闸没起来');
+      expect(s.canvas === 'block' && s.width > 0, `画布没在画：${JSON.stringify(s)}`);
+      expect(s.flat === 'hidden', '三维起来了，平面那张图却没收起来');
+      expect(!s.day, '才到第三拍就天亮了');
+      await shot('night');
+      await scrollLockTo(page, 1);
+      await page.waitForTimeout(1800);
+      s = await state();
+      expect(s.day, '滚到头了天还没亮');
+      await shot('day');
+      expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
+    },
+  },
+  {
+    // 没有 WebGL：退回平面的那张图，八拍照常走，水面照常从上往下退。
+    name: 'lock-flat',
+    engines: ['chromium'],
+    viewports: ['1440', '360'],
+    launch: { args: ['--disable-3d-apis'] },
+    async run({ page, url, shot, uncaught }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 15000 });
+      await scrollLockTo(page, 0.53);
+      await page.waitForFunction(() => document.querySelector('[data-lock]').dataset.beat === '4', null, { timeout: 4000, polling: 100 }).catch(() => {});
+      await page.waitForTimeout(900);
+      const s = await page.evaluate(() => {
+        const root = document.querySelector('[data-lock]');
+        return {
+          space: root.hasAttribute('data-lock-3d'),
+          beat: root.dataset.beat,
+          flat: getComputedStyle(root.querySelector('.lock__water .lock__scene')).visibility,
+          // 第四片（下标 3）这时应当已经注满：水那块矩形回到了原位。
+          filled: root.querySelector('.lock__water .slab[data-slab="3"] .slab__water').style.transform,
+          water: document.querySelector('[data-water]').dataset.mode,
+        };
+      });
+      expect(!s.space, '没有 WebGL，却标成了三维');
+      expect(s.beat === '4', `data-beat 是 ${s.beat}`);
+      expect(s.flat === 'visible', '平面那张图没显示出来');
+      expect(/translateY\(0(\.0+)?px\)/.test(s.filled), `第四片没注满：${s.filled}`);
+      expect(s.water === 'static', `首屏的水面应当是静态的，现在是 ${s.water}`);
+      await shot('p53');
+      expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
+    },
+  },
+  {
     // 在过闸中间刷新：场景停在对应的那一拍。
     name: 'lock-reload',
     viewports: ['1440', '360'],
@@ -204,7 +274,7 @@ export const CHECKS = [
         await scrollLockTo(page, 0.53);
         // 无头的 WebKit 出帧很慢（一秒一两帧），所以等到拍数对上为止，最多等 4 秒，不用固定的等待。
         await page
-          .waitForFunction(() => document.querySelector('[data-lock]').dataset.beat === '4', null, { timeout: 4000, polling: 100 })
+          .waitForFunction(() => document.querySelector('[data-lock]').dataset.beat === '4', null, { timeout: 12000, polling: 100 })
           .catch(() => {});
         const state = await page.evaluate(() => ({
           beat: document.querySelector('[data-lock]').dataset.beat,
@@ -570,17 +640,22 @@ async function main() {
   const results = [];
   try {
     for (const engine of args.engines) {
-      const browser = await playwright[engine].launch();
+      // 无头的 Chromium 默认用软件渲染 WebGL，三维的过闸在上面每秒只有几帧，会触发「画不动就换平面版」。
+      // 加这几个参数让它用本机的显卡，和真的浏览器一样。
+      const browser = await playwright[engine].launch(engine === 'chromium' ? { args: GPU_ARGS } : {});
       try {
         for (const check of checks) {
           if (check.engines && !check.engines.includes(engine)) continue;
+          // 要用别的参数起浏览器的核对（比如关掉 WebGL），单独起一个。
+          const own = check.launch ? await playwright[engine].launch(check.launch) : null;
           for (const lang of LANGS) {
             if (check.langs && !check.langs.includes(lang.code)) continue;
             for (const viewport of VIEWPORTS) {
               if (check.viewports && !check.viewports.includes(viewport.name)) continue;
-              results.push(await runCheck(browser, engine, check, lang, viewport, baseUrl, outDir, copy));
+              results.push(await runCheck(own ?? browser, engine, check, lang, viewport, baseUrl, outDir, copy));
             }
           }
+          if (own) await own.close();
         }
       } finally {
         await browser.close();

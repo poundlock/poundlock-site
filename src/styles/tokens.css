@@ -1,65 +1,66 @@
-/* 色、字、间距的变量。各节的样式只用这里的名字，不直接写色值：换一套配色只改这个文件。 */
+/* 色、字、间距的变量。各节的样式只用这里的名字，不直接写色值：换一套配色只改这个文件。
+   现在这一套叫「清水」：深色段是海军蓝，水从青蓝到白；浅色段是冷白，水从青到湛蓝。 */
 
 :root {
   /* —— 首屏的水面（着色器和它的静态底）—— */
-  --scene-0: #11606A;
-  --scene-1: #08323F;
-  --scene-glow: #7FE7D6;
+  --scene-0: #0B6088;
+  --scene-1: #041B33;
+  --scene-glow: #7FE3FF;
 
   /* —— 水，深色段里的三档，每档上下两端（过闸的八片在它们之间取色）—— */
-  --water-lo-0: #3CC4B0;
-  --mint-lo: #128C84;
-  --water-mid-0: #9AF0DD;
-  --mint-mid: #4FD0BB;
+  --water-lo-0: #2CC7E0;
+  --mint-lo: #0A86A3;
+  --water-mid-0: #8EEBFA;
+  --mint-mid: #3ECBE6;
   --water-hi-0: #FFFFFF;
-  --mint-hi: #D3F6EC;
+  --mint-hi: #D2F5FF;
 
   /* —— 水，浅色段里的三档 —— */
-  --blue-lo-0: #49B6A4;
-  --blue-lo: #23877E;
-  --blue-mid-0: #3A9AA6;
-  --blue-mid: #226F86;
-  --blue-hi-0: #2B7AAB;
-  --blue-hi: #17507C;
+  --blue-lo-0: #2BC4C9;
+  --blue-lo: #0E9AA0;
+  --blue-mid-0: #27A4DD;
+  --blue-mid: #0B79B5;
+  --blue-hi-0: #3F7FEA;
+  --blue-hi: #1E4FC4;
 
   /* —— 深色段：底、字、次要的字、强调、线 —— */
-  --zd-bg: #08323F;
-  --zd-fg: #F0F6FC;
-  --zd-muted: #C2E2DD;
-  --zd-accent: #7FE7D6;
-  --zd-line: #2C7480;
+  --zd-bg: #051F38;
+  --zd-fg: #F1F9FF;
+  --zd-muted: #B9D6E6;
+  --zd-accent: #7FE3FF;
+  --zd-line: #1B4667;
   /* 面板里亮一点的那一端、过闸画面中间亮的那一带、水面那道波 */
-  --zd-raise: #11606A;
-  --stage-glow: #0D4E5A;
-  --wave: #0E5560;
+  --zd-raise: #0A3A5C;
+  --stage-glow: #0A3552;
+  --wave: #0B3D5E;
   /* 半透明的小面（空闸室、标签、按钮的底）用它调淡 */
-  --tint: #7FE7D6;
+  --tint: #7FE3FF;
   /* 阴影的颜色 */
-  --shade: #031A21;
+  --shade: #020D1A;
 
   /* —— 浅色段 —— */
-  --zl-bg: #F8F4EB;
-  --zl-bg-2: #EAE3D5;
-  --zl-fg: #13212B;
-  --zl-muted: #4A5B63;
-  --zl-accent: #17507C;
-  --zl-line: #D5CCBA;
+  --zl-bg: #F3F9FC;
+  --zl-bg-2: #E2EEF5;
+  --zl-fg: #0A2233;
+  --zl-muted: #44606F;
+  --zl-accent: #0A6A9B;
+  --zl-line: #CFE0EA;
 
   /* —— 主按钮、角色的小标签、「它说的话」那片：深色段上的和浅色段上的 —— */
   --btn-d-0: #FFFFFF;
-  --btn-d-1: #D3F6EC;
-  --btn-d-fg: #08323F;
-  --btn-d-glow: #7FE7D6;
-  --btn-l-0: #28729F;
-  --btn-l-1: #17507C;
-  --btn-l-fg: #F0F6FC;
-  --btn-l-glow: #17507C;
-  --chip-d-0: #9AF0DD;
-  --chip-d-1: #4FD0BB;
-  --chip-d-fg: #08323F;
-  --chip-l-0: #226F86;
-  --chip-l-1: #1A5A70;
-  --chip-l-fg: #F0F6FC;
+  --btn-d-1: #D2F5FF;
+  --btn-d-fg: #051F38;
+  --btn-d-glow: #7FE3FF;
+  --btn-l-0: #1272B3;
+  --btn-l-1: #0A5488;
+  --btn-l-fg: #F1F9FF;
+  --btn-l-glow: #0A5488;
+  --chip-d-0: #8EEBFA;
+  --chip-d-1: #3ECBE6;
+  --chip-d-fg: #051F38;
+  --chip-l-0: #126FAB;
+  --chip-l-1: #0B5A8E;
+  --chip-l-fg: #F1F9FF;
 
   /* 字 */
   --font-sans: "PL Sans", "PL SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;

@@ -1,6 +1,6 @@
 import { html } from '../lib/html.js';
 import { starIcon } from './icons.js';
-import { wordmark } from '../brand.js';
+import { mark, wordmark } from '../brand.js';
 
 // 另一种语言的链接：从当前页到站点根的前缀，加上那一页的路径。
 export function langSwitch(ctx) {
@@ -14,11 +14,11 @@ export function langSwitch(ctx) {
 }
 
 export function render(ctx) {
-  const { t, base, config } = ctx;
+  const { t, config } = ctx;
   return html`<a class="skip-link" href="#main">${t.nav.skip}</a>
 <header class="site-header" data-header>
   <a class="brand" href="#hero" aria-label="poundlock">
-    <img class="brand__mark" src="${base}assets/logo/poundlock-tile.svg" alt="" width="28" height="28">
+    ${mark('brand__mark')}
     ${wordmark('brand__name')}
   </a>
   <nav class="site-nav">
