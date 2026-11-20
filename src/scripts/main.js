@@ -30,6 +30,8 @@ if (header) {
 const FEATURES = [
   ['./lock.js', 'initLock', '[data-lock]'],
   ['./breach.js', 'initBreach', '#breach'],
+  ['./roster.js', 'initRoster', '#roster'],
+  ['./copy-button.js', 'initCopyButtons', '#install'],
 ];
 
 async function start(path, init, selector, anime) {

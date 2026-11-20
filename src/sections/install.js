@@ -8,11 +8,13 @@ export function render(ctx) {
     <h2 class="section__title">${t.install.title}</h2>
     <p class="section__lead">${t.install.lead}</p>
   </header>
-  <div class="install__cmd">
-    <pre class="install__pre" data-copy-source tabindex="0"><code>${install.join('\n')}</code></pre>
-    <button type="button" class="btn btn--small install__copy" data-copy data-label-copied="${t.install.copied}" data-label-fallback="${t.install.copyFallback}" data-fit>${t.install.copy}</button>
+  <div class="install__panel on-deep">
+    <div class="install__cmd" data-copy-scope>
+      <pre class="install__pre" data-copy-source tabindex="0"><code>${install.join('\n')}</code></pre>
+      <button type="button" class="btn btn--primary btn--small install__copy" data-copy data-label-copied="${t.install.copied}" data-label-fallback="${t.install.copyFallback}" data-fit>${t.install.copy}</button>
+    </div>
+    <p class="install__warning">${t.install.scopeWarning}</p>
   </div>
-  <p class="install__warning">${t.install.scopeWarning}</p>
   <h3 class="install__first-title">${t.install.firstRunTitle}</h3>
   <ol class="install__first">
     ${firstRun.map(

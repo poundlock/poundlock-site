@@ -17,9 +17,18 @@
   "pain": {
     "title": "Three things that happen when the AI just writes",
     "items": [
-      { "claim": "“All done. Tests pass.”", "truth": "The tests never ran. It only said so." },
-      { "claim": "“This step isn’t important. Skipping it.”", "truth": "The step it skipped was the design, or the tests." },
-      { "claim": "“Built exactly as you asked.”", "truth": "What it built is no longer what your words asked for." }
+      {
+        "claim": "“All done. Tests pass.”",
+        "truth": "The tests never ran. It only said so."
+      },
+      {
+        "claim": "“This step isn’t important. Skipping it.”",
+        "truth": "The step it skipped was the design, or the tests."
+      },
+      {
+        "claim": "“Built exactly as you asked.”",
+        "truth": "What it built is no longer what your words asked for."
+      }
     ]
   },
   "lock": {
@@ -28,26 +37,80 @@
     "ledgerTitle": "What each stage leaves behind",
     "parallelNote": "Roles in the same stage work in parallel",
     "stages": {
-      "S1": { "name": "Contract", "line": "Your words are frozen word for word. Every later step is checked against them." },
-      "S2": { "name": "Product design", "line": "Product settles what to build, for whom, and what counts as done. UI writes the interaction and visual spec." },
-      "S3": { "name": "Technical plan", "line": "The architect fixes the plan and the interfaces, and says where every file goes." },
-      "S4": { "name": "Dispatch decision", "line": "The project manager decides which roles this run needs and which it leaves out." },
-      "S5": { "name": "Implementation", "line": "The architect hands the work to each platform. Every new behavior comes with an automated test." },
-      "S6": { "name": "Testing", "line": "The testing role runs tests and never writes them. Missing tests fail the stage." },
-      "S7": { "name": "Business acceptance", "line": "The result is checked against your words, clause by clause. Code style is not the question." },
-      "S8": { "name": "Delivery", "line": "The project manager writes the delivery report and the run is closed." }
+      "S1": {
+        "name": "Contract",
+        "line": "Your words are frozen word for word. Every later step is checked against them."
+      },
+      "S2": {
+        "name": "Product design",
+        "line": "Product settles what to build, for whom, and what counts as done. UI writes the interaction and visual spec."
+      },
+      "S3": {
+        "name": "Technical plan",
+        "line": "The architect fixes the plan and the interfaces, and says where every file goes."
+      },
+      "S4": {
+        "name": "Dispatch decision",
+        "line": "The project manager decides which roles this run needs and which it leaves out."
+      },
+      "S5": {
+        "name": "Implementation",
+        "line": "The architect hands the work to each platform. Every new behavior comes with an automated test."
+      },
+      "S6": {
+        "name": "Testing",
+        "line": "The testing role runs tests and never writes them. Missing tests fail the stage."
+      },
+      "S7": {
+        "name": "Business acceptance",
+        "line": "The result is checked against your words, clause by clause. Code style is not the question."
+      },
+      "S8": {
+        "name": "Delivery",
+        "line": "The project manager writes the delivery report and the run is closed."
+      }
     },
     "roles": {
-      "pm": { "name": "Project manager", "job": "The only role you talk to. It takes the requirement from intake to delivery, dispatching layer by layer and checking each stage." },
-      "product": { "name": "Product", "job": "Turns the contract into a product definition: what to build, for whom, what counts as done." },
-      "ui": { "name": "UI", "job": "Writes the interaction and visual spec, then builds it in the implementation stage." },
-      "architect": { "name": "Architect", "job": "Turns the product definition into a technical plan and interface contracts, then hands the work to the implementers." },
-      "backend": { "name": "Backend", "job": "Writes the server side to the plan and the interface contracts, and runs it to verify." },
-      "frontend": { "name": "Frontend", "job": "Writes the front end to the plan and the interface contracts, and runs it to verify." },
-      "ios": { "name": "iOS", "job": "Writes the iOS app to the plan and the interface contracts, and runs it to verify." },
-      "android": { "name": "Android", "job": "Writes the Android app to the plan and the interface contracts, and runs it to verify." },
-      "qa": { "name": "Testing role", "job": "Runs the existing tests and reviews this run’s changes. It does not change implementation code." },
-      "acceptance": { "name": "Acceptance role", "job": "Checks the result against the contract, clause by clause. It does not build and does not change code." }
+      "pm": {
+        "name": "Project manager",
+        "job": "The only role you talk to. It takes the requirement from intake to delivery, dispatching layer by layer and checking each stage."
+      },
+      "product": {
+        "name": "Product",
+        "job": "Turns the contract into a product definition: what to build, for whom, what counts as done."
+      },
+      "ui": {
+        "name": "UI",
+        "job": "Writes the interaction and visual spec, then builds it in the implementation stage."
+      },
+      "architect": {
+        "name": "Architect",
+        "job": "Turns the product definition into a technical plan and interface contracts, then hands the work to the implementers."
+      },
+      "backend": {
+        "name": "Backend",
+        "job": "Writes the server side to the plan and the interface contracts, and runs it to verify."
+      },
+      "frontend": {
+        "name": "Frontend",
+        "job": "Writes the front end to the plan and the interface contracts, and runs it to verify."
+      },
+      "ios": {
+        "name": "iOS",
+        "job": "Writes the iOS app to the plan and the interface contracts, and runs it to verify."
+      },
+      "android": {
+        "name": "Android",
+        "job": "Writes the Android app to the plan and the interface contracts, and runs it to verify."
+      },
+      "qa": {
+        "name": "Testing role",
+        "job": "Runs the existing tests and reviews this run’s changes. It does not change implementation code."
+      },
+      "acceptance": {
+        "name": "Acceptance role",
+        "job": "Checks the result against the contract, clause by clause. It does not build and does not change code."
+      }
     }
   },
   "breach": {
@@ -82,12 +145,30 @@
       }
     },
     "gates": {
-      "dispatch": { "name": "Dispatch whitelist", "what": "Who may dispatch whom follows the roster. Skipping a level is refused." },
-      "readiness": { "name": "Readiness", "what": "Until the previous stage has handed everything over, nobody can be sent into the next." },
-      "writepath": { "name": "Write-path isolation", "what": "Each role writes only inside the directories assigned to it." },
-      "contract": { "name": "Contract protection", "what": "Only you change your words. No role can touch them." },
-      "deliverable": { "name": "Deliverable checks", "what": "A role cannot stop while the deliverable it owes is missing." },
-      "budget": { "name": "Rework budget", "what": "Three rework rounds at most. After that it has to ask you." }
+      "dispatch": {
+        "name": "Dispatch whitelist",
+        "what": "Who may dispatch whom follows the roster. Skipping a level is refused."
+      },
+      "readiness": {
+        "name": "Readiness",
+        "what": "Until the previous stage has handed everything over, nobody can be sent into the next."
+      },
+      "writepath": {
+        "name": "Write-path isolation",
+        "what": "Each role writes only inside the directories assigned to it."
+      },
+      "contract": {
+        "name": "Contract protection",
+        "what": "Only you change your words. No role can touch them."
+      },
+      "deliverable": {
+        "name": "Deliverable checks",
+        "what": "A role cannot stop while the deliverable it owes is missing."
+      },
+      "budget": {
+        "name": "Rework budget",
+        "what": "Three rework rounds at most. After that it has to ask you."
+      }
     }
   },
   "contract": {
@@ -97,25 +178,49 @@
     "words": "Build a small expense tracker: record an expense, see a monthly summary, export a CSV.",
     "reworkNote": "One clause failed, so the run goes back to implementation for rework. After rework, the test, acceptance and delivery reports are all produced anew.",
     "clauses": [
-      { "quote": "record an expense", "note": "Pass: it can be entered and saved." },
-      { "quote": "see a monthly summary", "note": "Pass: the monthly totals add up." },
-      { "quote": "export a CSV", "note": "Fail: there is no way to export on the page." }
+      {
+        "quote": "record an expense",
+        "note": "Pass: it can be entered and saved."
+      },
+      {
+        "quote": "see a monthly summary",
+        "note": "Pass: the monthly totals add up."
+      },
+      {
+        "quote": "export a CSV",
+        "note": "Fail: there is no way to export on the page."
+      }
     ]
   },
   "roster": {
     "title": "Ten roles, one stage each",
     "lead": "The project manager dispatches product, the architect, the testing role and the acceptance role. Product dispatches UI. The architect dispatches backend, frontend, UI, iOS and Android. Who may dispatch whom is written in the roster and checked by a gate.",
-    "youTalkTo": "You talk to the project manager only"
+    "youTalkTo": "You talk to the project manager only",
+    "you": "You",
+    "dispatchedBy": "Dispatched by {who}",
+    "listJoin": " and "
   },
   "limits": {
     "title": "What it is not",
     "lead": "Know these before you install.",
     "more": "The full list of known limitations is in the README",
     "items": [
-      { "head": "Not a sandbox", "body": "The gates govern the order of dispatch, file writes and delivery. Roles keep Bash to build and test, and the command line is outside the gates." },
-      { "head": "It takes over this project’s main session", "body": "Once installed, the main session of every new session in this project is the project manager. That is why the install command carries --scope local: it applies to this one project only." },
-      { "head": "It runs in Chinese", "body": "Role prompts, deliverable templates and gate messages are all Chinese, and the gates recognise a few Chinese option labels verbatim." },
-      { "head": "Requirements", "body": "Claude Code 2.1.276 or later. Node 16.9 or later, on the PATH that Claude Code starts with. On native Windows, Git for Windows as well." }
+      {
+        "head": "Not a sandbox",
+        "body": "The gates govern the order of dispatch, file writes and delivery. Roles keep Bash to build and test, and the command line is outside the gates."
+      },
+      {
+        "head": "It takes over this project’s main session",
+        "body": "Once installed, the main session of every new session in this project is the project manager. That is why the install command carries --scope local: it applies to this one project only."
+      },
+      {
+        "head": "It runs in Chinese",
+        "body": "Role prompts, deliverable templates and gate messages are all Chinese, and the gates recognise a few Chinese option labels verbatim."
+      },
+      {
+        "head": "Requirements",
+        "body": "Claude Code 2.1.276 or later. Node 16.9 or later, on the PATH that Claude Code starts with. On native Windows, Git for Windows as well."
+      }
     ]
   },
   "install": {
@@ -126,7 +231,10 @@
     "copied": "Copied",
     "copyFallback": "Selected. Copy it by hand.",
     "firstRunTitle": "First run",
-    "firstRunSteps": ["Once per project: it surveys the project and writes the project config.", "Put your requirement after it to start a run."],
+    "firstRunSteps": [
+      "Once per project: it surveys the project and writes the project config.",
+      "Put your requirement after it to start a run."
+    ],
     "more": "Update, uninstall and the other commands are in the README"
   },
   "footer": {

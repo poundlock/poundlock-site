@@ -475,6 +475,90 @@ export const CHECKS = [
     },
   },
   {
+    // 复制安装命令：浏览器给剪贴板时，按钮上的字换成「已复制」，剪贴板里就是那两条命令。
+    name: 'copy-ok',
+    engines: ['chromium'],
+    viewports: ['1440', '360'],
+    context: { permissions: ['clipboard-read', 'clipboard-write'] },
+    async run({ page, url, t }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForFunction(() => document.querySelector('#roster')?.dataset.rosterLive === 'true', null, { timeout: 8000 });
+      const button = page.locator('#install button[data-copy]');
+      await button.scrollIntoViewIfNeeded();
+      await button.click();
+      await page.waitForFunction((label) => document.querySelector('#install button[data-copy]').textContent.trim() === label, t.install.copied, { timeout: 3000 }).catch(() => {});
+      const label = (await button.textContent()).trim();
+      expect(label === t.install.copied, `点了复制，按钮上是「${label}」，应当是「${t.install.copied}」`);
+      // Windows 的剪贴板会把换行换成回车加换行：比的时候不计这个。
+      const clip = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
+      const source = await page.locator('#install pre[data-copy-source]').textContent();
+      expect(clip === source && clip.split('\n').length === 2, `剪贴板里不是那两条命令：${JSON.stringify(clip)}`);
+      // 两秒后换回原来的字。
+      await page.waitForTimeout(2300);
+      const back = (await button.textContent()).trim();
+      expect(back === t.install.copy, `两秒后按钮上是「${back}」，应当换回「${t.install.copy}」`);
+    },
+  },
+  {
+    // 浏览器不给剪贴板：把那段命令选中，按钮上的字提示访客自己复制。
+    name: 'copy-fallback',
+    viewports: ['1440', '360'],
+    async run({ page, url, t }) {
+      await page.addInitScript(() => {
+        Object.defineProperty(Navigator.prototype, 'clipboard', { get: () => undefined, configurable: true });
+      });
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForFunction(() => document.querySelector('#roster')?.dataset.rosterLive === 'true', null, { timeout: 8000 });
+      const button = page.locator('#install button[data-copy]');
+      await button.scrollIntoViewIfNeeded();
+      await button.click();
+      await page.waitForFunction((label) => document.querySelector('#install button[data-copy]').textContent.trim() === label, t.install.copyFallback, { timeout: 3000 }).catch(() => {});
+      const label = (await button.textContent()).trim();
+      expect(label === t.install.copyFallback, `没有剪贴板，按钮上是「${label}」，应当是「${t.install.copyFallback}」`);
+      const picked = (await page.evaluate(() => getSelection().toString())).replace(/\r\n/g, '\n');
+      const source = await page.locator('#install pre[data-copy-source]').textContent();
+      expect(picked.trim() === source.trim(), `选中的不是那两条命令：${JSON.stringify(picked)}`);
+    },
+  },
+  {
+    // 团队那张图能用键盘看：聚焦到「架构师」，它亮起来，它连着的六条线（项目经理派给它的一条、它派出去的五条）也亮起来。
+    name: 'roster-focus',
+    viewports: ['1440'],
+    async run({ page, url, shot }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForFunction(() => document.querySelector('#roster')?.dataset.rosterLive === 'true', null, { timeout: 8000 });
+      await page.evaluate(() => {
+        document.documentElement.style.scrollBehavior = 'auto';
+        document.getElementById('roster').scrollIntoView({ block: 'start' });
+      });
+      // 从它前面那个角色按 Tab 过来，走的是真的键盘焦点。
+      await page.focus('[data-role-node="ui"]');
+      await page.keyboard.press('Tab');
+      const state = await page.evaluate(() => ({
+        focused: document.activeElement?.dataset.roleNode,
+        active: document.querySelector('[data-role-node="architect"]').hasAttribute('data-active'),
+        edges: [...document.querySelectorAll('#roster [data-edge][data-active]')].map((path) => path.dataset.edge).sort(),
+        linked: [...document.querySelectorAll('#roster [data-role-node][data-linked]')].map((node) => node.dataset.roleNode).sort(),
+        outline: getComputedStyle(document.activeElement).outlineStyle,
+        // 线画到了哪：每条亮着的线都得有长度（没被隐藏）。
+        drawn: [...document.querySelectorAll('#roster [data-edge][data-active]')].every((path) => path.getBoundingClientRect().height > 10),
+      }));
+      expect(state.focused === 'architect', `按 Tab 以后焦点在 ${state.focused}，不在架构师上`);
+      expect(state.active, '架构师聚焦了却没亮');
+      const want = ['architect>android', 'architect>backend', 'architect>frontend', 'architect>ios', 'architect>ui', 'pm>architect'];
+      expect(JSON.stringify(state.edges) === JSON.stringify(want), `亮着的线是 ${state.edges.join('、')}`);
+      expect(JSON.stringify(state.linked) === JSON.stringify(['android', 'backend', 'frontend', 'ios', 'pm', 'ui']), `标出来的相关角色是 ${state.linked.join('、')}`);
+      expect(state.outline !== 'none', '聚焦的角色上看不见焦点框');
+      expect(state.drawn, '亮着的线没画出来');
+      await shot('architect');
+      await page.keyboard.press('Shift+Tab');
+      await page.focus('body').catch(() => {});
+      await page.evaluate(() => document.activeElement && document.activeElement.blur());
+      const cleared = await page.evaluate(() => document.querySelectorAll('#roster [data-active]').length);
+      expect(cleared === 0, `焦点移开以后还有 ${cleared} 处亮着`);
+    },
+  },
+  {
     name: 'shots',
     async run({ page, url, shot }) {
       await page.goto(url, { waitUntil: 'load' });
