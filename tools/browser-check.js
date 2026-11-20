@@ -97,6 +97,32 @@ export const CHECKS = [
     },
   },
   {
+    // 首屏的水面：有显卡的浏览器里，打开几秒以后它还在画，没有被当成「画不动」关掉。
+    // 出过这个事：别的模块在页面一打开时加载，卡了一下，帧率看门狗误判，把水面换成了静态的底。
+    name: 'water-live',
+    engines: ['chromium'],
+    viewports: ['1440', '360'],
+    async run({ page, url }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForTimeout(6500);
+      const mode = await page.evaluate(() => document.querySelector('[data-water]').dataset.mode);
+      expect(mode === 'webgl', `打开六秒多以后，水面的 data-mode 是 ${mode}`);
+      // 从头到尾慢慢滚一遍再滚回来（过闸的三维场景会在中途加载），水面还得是活的。
+      await page.evaluate(async () => {
+        document.documentElement.style.scrollBehavior = 'auto';
+        const total = document.documentElement.scrollHeight - innerHeight;
+        for (let i = 0; i <= 20; i++) {
+          scrollTo(0, (total * i) / 20);
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+        scrollTo(0, 0);
+      });
+      await page.waitForTimeout(3500);
+      const after = await page.evaluate(() => document.querySelector('[data-water]').dataset.mode);
+      expect(after === 'webgl', `滚了一圈回到页顶，水面的 data-mode 是 ${after}`);
+    },
+  },
+  {
     // 接口不给数（仓库还没公开时就是 404）：只显示按钮，不留数字，不抛错。
     name: 'stars-fail',
     viewports: ['1440'],
@@ -183,6 +209,8 @@ export const CHECKS = [
           };
         });
       await scrollLockTo(page, 0.3);
+      // 画面是快滚到时才加载的：等它挂上。
+      await page.waitForSelector('[data-lock][data-lock-scene]', { timeout: 15000 });
       await page.waitForTimeout(1200);
       let s = await state();
       expect(s.space, '三维的过闸没起来');
@@ -208,6 +236,7 @@ export const CHECKS = [
       await page.goto(url, { waitUntil: 'load' });
       await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 15000 });
       await scrollLockTo(page, 0.53);
+      await page.waitForSelector('[data-lock][data-lock-scene="flat"]', { timeout: 15000 });
       await page.waitForFunction(() => document.querySelector('[data-lock]').dataset.beat === '4', null, { timeout: 4000, polling: 100 }).catch(() => {});
       await page.waitForTimeout(900);
       const s = await page.evaluate(() => {

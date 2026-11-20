@@ -166,7 +166,8 @@ export function mountWater(canvas, { reduced = false, onDegrade } = {}) {
 
   const pointer = { x: 0, y: 0, strength: 0 };
   let running = false;
-  let visible = true;
+  // 页面可能是在后台打开的：一开始就看标签页现在可不可见。
+  let visible = !canvas.ownerDocument.hidden;
   let onScreen = true;
   let elapsed = 0;
   let lastTime = null;

@@ -144,7 +144,7 @@ function mountFlat(root, anime) {
   };
 }
 
-export async function initLock(root, anime, { reduced = false } = {}) {
+export function initLock(root, anime, { reduced = false } = {}) {
   const none = { destroy() {} };
   if (reduced) return none;
 
@@ -155,19 +155,6 @@ export async function initLock(root, anime, { reduced = false } = {}) {
   const chambers = [...root.querySelectorAll('[data-stage]')];
   const tags = [...root.querySelectorAll('[data-ledger-beat]')];
   if (!track) return none;
-
-  let scene = null;
-  if (canvas) {
-    try {
-      root.setAttribute('data-lock-3d', 'true');
-      scene = await mountSpace(root, canvas);
-    } catch (error) {
-      root.removeAttribute('data-lock-3d');
-      console.warn('[poundlock] 三维的过闸没起来，改用平面的。', error);
-    }
-  }
-  if (!scene && anime) scene = mountFlat(root, anime);
-  if (!scene) return none;
 
   // 这一拍、这一段的文字、账本里已经落下的产物：直接跟着滚动位置走。
   let progress = 0;
@@ -184,9 +171,14 @@ export async function initLock(root, anime, { reduced = false } = {}) {
     tags.forEach((tag) => tag.toggleAttribute('data-in', Number(tag.dataset.ledgerBeat) <= beat));
   };
 
-  // 三维的画不动时：先降清晰度；还不行，换成平面的。
+  // 画面（三维的，或者平面的）等快滚到这一节了才去加载：三维的库很大，页面一打开就加载它，
+  // 会让首屏卡一下——出过一次事：首屏的水面因此被当成「设备画不动」关掉了。
+  let scene = null;
+  let mounting = false;
   let strikes = 0;
   let watchdog = null;
+
+  // 三维的画不动时：先降清晰度；还不行，换成平面的。
   const watch = () => {
     watchdog = createFpsWatchdog({
       minFps: 30,
@@ -200,11 +192,34 @@ export async function initLock(root, anime, { reduced = false } = {}) {
           scene.destroy();
           root.removeAttribute('data-lock-3d');
           scene = mountFlat(root, anime);
+          if (scene) root.dataset.lockScene = scene.kind;
         }
       },
     });
   };
-  if (scene.kind === 'space') watch();
+
+  const mount = async () => {
+    if (scene || mounting) return;
+    mounting = true;
+    let mounted = null;
+    if (canvas) {
+      try {
+        root.setAttribute('data-lock-3d', 'true');
+        mounted = await mountSpace(root, canvas);
+      } catch (error) {
+        root.removeAttribute('data-lock-3d');
+        console.warn('[poundlock] 三维的过闸没起来，改用平面的。', error);
+      }
+    }
+    if (!mounted && anime) mounted = mountFlat(root, anime);
+    mounting = false;
+    if (!mounted) return;
+    scene = mounted;
+    root.dataset.lockScene = scene.kind;
+    if (scene.kind === 'space') watch();
+    apply();
+    scene.frame(progress, win.performance.now(), true);
+  };
 
   // 这一节在视口里的时候每帧做两件事：读一次滚动位置（不单靠 scroll 事件——有的浏览器在惯性滚动、
   // 或者脚本滚动之后，事件来得晚），再画一帧。不在视口里就停。
@@ -225,12 +240,22 @@ export async function initLock(root, anime, { reduced = false } = {}) {
   });
   observer.observe(track);
 
+  // 离这一节还有一屏的时候开始加载画面。
+  const nearby = new win.IntersectionObserver(
+    (entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      // 这一节紧挨着首屏：页面刚打开时它就算「快到了」。等首屏那段入场动画放完再加载，别抢它的帧。
+      win.setTimeout(mount, Math.max(0, 3500 - win.performance.now()));
+    },
+    { rootMargin: '100% 0px 100% 0px' },
+  );
+  nearby.observe(track);
+
   const onChange = () => apply();
   win.addEventListener('scroll', onChange, { passive: true });
   win.addEventListener('resize', onChange);
 
   apply();
-  scene.frame(progress, win.performance.now());
   root.dataset.lockLive = 'true';
 
   return {
@@ -238,10 +263,12 @@ export async function initLock(root, anime, { reduced = false } = {}) {
       win.removeEventListener('scroll', onChange);
       win.removeEventListener('resize', onChange);
       observer.disconnect();
+      nearby.disconnect();
       if (frame) win.cancelAnimationFrame(frame);
       if (watchdog) watchdog.stop();
       if (scene) scene.destroy();
       delete root.dataset.lockLive;
+      delete root.dataset.lockScene;
       root.removeAttribute('data-lock-3d');
     },
   };

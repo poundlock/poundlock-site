@@ -19,44 +19,67 @@ function setup(options = {}) {
 
 test('帧率够就不降级', () => {
   const { clock, watchdog, count } = setup();
-  feed(watchdog, clock, 16.7, 3000);
+  feed(watchdog, clock, 16.7, 8000);
   assert.equal(count(), 0);
 });
 
-test('帧率不够降级一次，之后不再重复', () => {
+test('帧率一直不够，降级一次，之后不再重复', () => {
   const { clock, watchdog, count } = setup();
-  feed(watchdog, clock, 50, 2100);
+  feed(watchdog, clock, 50, 6000);
   assert.equal(count(), 1);
-  feed(watchdog, clock, 50, 2000);
+  feed(watchdog, clock, 50, 4000);
   assert.equal(count(), 1);
 });
 
-test('刚开始的一两帧慢不算', () => {
+test('刚挂上的头几秒不算：页面还在加载别的东西', () => {
+  // 头两秒只有每秒 20 帧，之后恢复正常：不降级。
   const { clock, watchdog, count } = setup();
-  feed(watchdog, clock, 200, 400);
-  feed(watchdog, clock, 16.7, 3000);
+  feed(watchdog, clock, 50, 2000);
+  feed(watchdog, clock, 16.7, 6000);
+  assert.equal(count(), 0);
+});
+
+test('加载时卡上一秒不算掉帧', () => {
+  // 这就是出过的事：页面一打开别的模块在加载，主线程卡了将近一秒，水面被误判成画不动、关掉了。
+  const { clock, watchdog, count } = setup();
+  feed(watchdog, clock, 16.7, 500);
+  clock.t += 900;
+  watchdog.tick();
+  feed(watchdog, clock, 16.7, 6000);
+  assert.equal(count(), 0);
+});
+
+test('中途偶尔卡一下（几百毫秒）不算', () => {
+  const { clock, watchdog, count } = setup();
+  feed(watchdog, clock, 16.7, 4000);
+  for (let i = 0; i < 4; i++) {
+    clock.t += 400;
+    watchdog.tick();
+    feed(watchdog, clock, 16.7, 1500);
+  }
   assert.equal(count(), 0);
 });
 
 test('stop 之后不再调', () => {
   const { clock, watchdog, count } = setup();
   watchdog.stop();
-  feed(watchdog, clock, 50, 4000);
+  feed(watchdog, clock, 50, 8000);
   assert.equal(count(), 0);
 });
 
 test('标签页切走再回来的那一长帧不算掉帧', () => {
   const { clock, watchdog, count } = setup();
-  feed(watchdog, clock, 16.7, 1000);
+  feed(watchdog, clock, 16.7, 4000);
   clock.t += 60000;
   watchdog.tick();
-  feed(watchdog, clock, 16.7, 3000);
+  feed(watchdog, clock, 16.7, 4000);
   assert.equal(count(), 0);
 });
 
-test('连着几帧都隔一秒以上，是真的卡，也降级', () => {
+test('过了头几秒以后，连着三帧都隔一秒以上，是真的卡，也降级', () => {
   const { clock, watchdog, count } = setup();
-  feed(watchdog, clock, 1500, 6000);
+  feed(watchdog, clock, 16.7, 3000);
+  feed(watchdog, clock, 1500, 4500);
   assert.equal(count(), 1);
 });
 
