@@ -9,3 +9,8 @@
 .DS_Store
 Thumbs.db
 # /wellyard:gitignore
+
+# 生成结果与本机工具
+/dist/
+/node_modules/
+/.shots/
