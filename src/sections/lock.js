@@ -54,7 +54,7 @@ export function render(ctx) {
   <div class="lock__track" data-lock-track>
     <div class="lock__stage">
       <!-- 水面以上：同一张图换成浅色版，停在最后一段。动效在的时候垫在水的下面，水退下去才露出来。 -->
-      <div class="lock__layer lock__air" aria-hidden="true">
+      <div class="lock__layer lock__air on-light" aria-hidden="true">
         <div class="lock__scene">${renderScene({ tone: 'light' })}</div>
         <div class="lock__flight">
           <div class="chamber" data-current>
@@ -76,7 +76,7 @@ export function render(ctx) {
       </div>
       <!-- 水面：一道波，带一线亮光，底下一条往下淡出的亮带。水从上往下退的时候，它压在水的上沿。 -->
       <svg class="lock__wave" viewBox="0 0 1200 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <defs><linearGradient id="lock-wave-fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0E5560"/><stop offset="1" stop-color="#0E5560" stop-opacity="0"/></linearGradient></defs>
+        <defs><linearGradient id="lock-wave-fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--wave)"/><stop offset="1" style="stop-color:var(--wave)" stop-opacity="0"/></linearGradient></defs>
         <path class="lock__wave-body" d="M0 41V22C100 6 200 6 300 20S500 36 600 20S800 4 900 20S1100 34 1200 18V41Z"/>
         <rect x="0" y="40" width="1200" height="60" fill="url(#lock-wave-fade)"/>
         <path class="lock__wave-line" d="M0 22C100 6 200 6 300 20S500 36 600 20S800 4 900 20S1100 34 1200 18"/>

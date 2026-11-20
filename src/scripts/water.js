@@ -11,17 +11,32 @@ void main() {
 }
 `;
 
-// 颜色取图标深色版：底 #11606A → #08323F，光 #7FE7D6。
+// 颜色不写在着色器里：挂上去的时候从调色板读（--scene-0、--scene-1、--scene-glow），读不到用下面的默认色。
+const DEFAULT_COLORS = {
+  '--scene-0': [0.067, 0.376, 0.416],
+  '--scene-1': [0.031, 0.196, 0.247],
+  '--scene-glow': [0.498, 0.906, 0.839],
+};
+
+// '#11606A' → [0.067, 0.376, 0.416]。不是六位十六进制色值就返回 null。
+export function hexToRgb(value) {
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(value ?? '').trim());
+  return match ? match.slice(1).map((part) => parseInt(part, 16) / 255) : null;
+}
+
 const FRAGMENT = `
 precision mediump float;
 uniform vec2 u_res;
 uniform float u_time;
 uniform vec2 u_pointer;
 uniform float u_ripple;
+uniform vec3 u_deep0;
+uniform vec3 u_deep1;
+uniform vec3 u_glow;
 
-const vec3 DEEP0 = vec3(0.067, 0.376, 0.416);
-const vec3 DEEP1 = vec3(0.031, 0.196, 0.247);
-const vec3 GLOW = vec3(0.498, 0.906, 0.839);
+#define DEEP0 u_deep0
+#define DEEP1 u_deep1
+#define GLOW u_glow
 
 // 几层互相扭曲的波，取它们的脊线，就是水底那种一格一格晃动的光。
 float caustic(vec2 p, float t) {
@@ -141,6 +156,14 @@ export function mountWater(canvas, { reduced = false, onDegrade } = {}) {
   const uRipple = gl.getUniformLocation(program, 'u_ripple');
 
   const win = canvas.ownerDocument.defaultView;
+
+  // 从调色板取色。
+  const css = win.getComputedStyle(canvas);
+  const colors = { '--scene-0': 'u_deep0', '--scene-1': 'u_deep1', '--scene-glow': 'u_glow' };
+  for (const [name, uniform] of Object.entries(colors)) {
+    gl.uniform3fv(gl.getUniformLocation(program, uniform), hexToRgb(css.getPropertyValue(name)) ?? DEFAULT_COLORS[name]);
+  }
+
   const pointer = { x: 0, y: 0, strength: 0 };
   let running = false;
   let visible = true;

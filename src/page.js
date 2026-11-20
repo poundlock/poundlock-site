@@ -39,6 +39,7 @@ ${config.langs.map((l) => html`<link rel="alternate" hreflang="${l.htmlLang}" hr
 <link rel="icon" type="image/svg+xml" href="${base}assets/logo/poundlock-tile.svg">
 <link rel="stylesheet" href="${base}assets/site.css">
 <script>document.documentElement.classList.add('js',matchMedia('(prefers-reduced-motion: reduce)').matches?'motion-reduced':'motion-ok')</script>
+<script>/* 临时：挑配色用，定稿后删掉 */(function(){var p=new URLSearchParams(location.search).get('palette');if(p)document.documentElement.dataset.palette=p})()</script>
 <script type="module" src="${base}assets/scripts/main.js"></script>
 </head>`;
 }

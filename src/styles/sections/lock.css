@@ -3,7 +3,7 @@
    .js.motion-ok：画面停在视口里，滚动推进八拍；最后整片水往下退，同一张图在水面以上换成浅色。 */
 
 .lock {
-  background: var(--deep-1);
+  background: var(--bg);
   padding-bottom: 0;
 }
 
@@ -20,19 +20,19 @@
 }
 
 .slab__shell {
-  fill: rgba(127, 231, 214, 0.07);
-  stroke: rgba(127, 231, 214, 0.26);
+  fill: color-mix(in srgb, var(--tint) 7%, transparent);
+  stroke: color-mix(in srgb, var(--tint) 26%, transparent);
   stroke-width: 1.5;
 }
 
 .slab__lane {
-  stroke: var(--deep-1);
+  stroke: var(--zd-bg);
   stroke-width: 3;
   opacity: 0.5;
 }
 
 .gate {
-  fill: var(--glow);
+  fill: var(--zd-accent);
   opacity: 0.8;
   transform-box: fill-box;
   transform-origin: center top;
@@ -40,25 +40,25 @@
 
 .gauge__rail,
 .gauge__tick {
-  stroke: rgba(194, 226, 221, 0.55);
+  stroke: color-mix(in srgb, var(--zd-muted) 55%, transparent);
   stroke-width: 1.5;
   stroke-linecap: round;
 }
 
 .gauge__num {
-  fill: #C2E2DD;
+  fill: var(--zd-muted);
   font-family: var(--font-gauge);
   font-size: 15px;
   font-weight: 600;
 }
 
 .gauge__float {
-  fill: var(--glow);
+  fill: var(--zd-accent);
 }
 
 .boat__hull,
 .boat__sail {
-  fill: var(--snow);
+  fill: var(--zd-fg);
 }
 
 .boat__sail {
@@ -66,7 +66,7 @@
 }
 
 .boat {
-  filter: drop-shadow(0 6px 10px rgba(3, 26, 33, 0.45));
+  filter: drop-shadow(0 6px 10px color-mix(in srgb, var(--shade) 45%, transparent));
   /* 升满了的样子：船停在最高一级，浮标也在那。位置是场景自带的变量，和几何是同一份数。 */
   transform: translate(var(--boat-rest-x), var(--boat-rest-y));
 }
@@ -82,31 +82,31 @@
 }
 
 .lock__svg--light .slab__lane {
-  stroke: var(--paper-0);
+  stroke: var(--zl-bg);
 }
 
 .lock__svg--light .gate {
-  fill: var(--blue-hi);
+  fill: var(--zl-accent);
   opacity: 0.3;
 }
 
 .lock__svg--light .gauge__rail,
 .lock__svg--light .gauge__tick {
-  stroke: rgba(19, 33, 43, 0.4);
+  stroke: color-mix(in srgb, var(--zl-fg) 40%, transparent);
 }
 
 .lock__svg--light .gauge__num {
-  fill: #4A5B63;
+  fill: var(--zl-muted);
 }
 
 .lock__svg--light .gauge__float,
 .lock__svg--light .boat__hull,
 .lock__svg--light .boat__sail {
-  fill: var(--blue-hi);
+  fill: var(--zl-accent);
 }
 
 .lock__svg--light .boat {
-  filter: drop-shadow(0 6px 10px rgba(23, 80, 124, 0.25));
+  filter: drop-shadow(0 6px 10px color-mix(in srgb, var(--zl-accent) 25%, transparent));
 }
 
 /* ---------- 默认：静态 ---------- */
@@ -180,8 +180,8 @@
   border-radius: var(--radius-l);
   font-size: var(--text-2);
   font-weight: 600;
-  color: var(--deep-1);
-  background: linear-gradient(180deg, var(--water-mid-0), var(--mint-mid));
+  color: var(--chip-fg);
+  background: linear-gradient(180deg, var(--chip-0), var(--chip-1));
 }
 
 .chamber__note {
@@ -213,7 +213,7 @@
   margin-inline: calc(-1 * max(var(--page-pad), (100vw - var(--page-max)) / 2));
   padding: 0;
   overflow: hidden;
-  background: var(--paper-0);
+  background: var(--zl-bg);
 }
 
 /* 水下和水面以上两层，版式一模一样，图才能在水退下去的时候原地换色。 */
@@ -233,19 +233,14 @@
 }
 
 .js.motion-ok .lock__air {
-  --bg: #F8F4EB;
-  --fg: #13212B;
-  --muted: #4A5B63;
-  --accent: #17507C;
-  --line: #D5CCBA;
-  background: var(--paper-0);
+  background: var(--bg);
 }
 
 /* 水从上往下退：水这一层不挪位置，只是从上往下被裁掉，底下那张浅色的图就在原地露出来。
    --surface 由 lock.js 写在 .lock__stage 上，0 是水满着，1 是退完了。 */
 .js.motion-ok .lock__water {
   /* 最上面一行和上一节的底色一样，画面滚进来的时候不留一道边；亮的那一带在偏上的位置。 */
-  background: linear-gradient(180deg, var(--deep-1) 0%, #0D4E5A 26%, var(--deep-1) 72%);
+  background: linear-gradient(180deg, var(--bg) 0%, var(--stage-glow) 26%, var(--bg) 72%);
   clip-path: inset(calc(var(--surface, 0) * (100% + 48px)) 0 0 0);
   will-change: clip-path;
 }
@@ -260,16 +255,18 @@
   height: 100px;
   pointer-events: none;
   transform: translateY(calc(var(--surface, 0) * (100svh + 48px)));
-  will-change: transform;
+  /* 水还满着的时候不显示：不然它底下那条淡出的亮带会在画面顶上露出一道边。水一开始退就显出来。 */
+  opacity: clamp(0, var(--surface, 0) * 40, 1);
+  will-change: transform, opacity;
 }
 
 .lock__wave-body {
-  fill: #0E5560;
+  fill: var(--wave);
 }
 
 .lock__wave-line {
   fill: none;
-  stroke: var(--glow);
+  stroke: var(--zd-accent);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
   opacity: 0.8;
@@ -351,11 +348,6 @@
   display: none;
 }
 
-.lock__air .chip {
-  color: var(--snow);
-  background: linear-gradient(180deg, var(--blue-mid-0), var(--blue-mid));
-}
-
 /* 账本：每过一段，这一段的产物落进来。 */
 .js.motion-ok .lock__ledger {
   grid-area: ledger;
@@ -381,8 +373,8 @@
   padding: 0.2em 0.75em;
   border-radius: var(--radius-s);
   font-size: var(--text-1);
-  color: var(--mint-hi);
-  background: rgba(127, 231, 214, 0.12);
+  color: var(--fg);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   opacity: 0;
   transform: translateY(-10px);
   transition: opacity 240ms ease, transform 420ms var(--ease-water);
@@ -394,8 +386,8 @@
 }
 
 .lock__air .lock__tag {
-  color: var(--blue-hi);
-  background: var(--paper-1);
+  color: var(--accent);
+  background: var(--zl-bg-2);
 }
 
 @media (max-width: 767px) {

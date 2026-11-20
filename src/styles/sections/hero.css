@@ -11,8 +11,8 @@
   overflow: hidden;
   /* 水面没起来时的样子：和图标同一个方向的底、左上一抹光。 */
   background:
-    radial-gradient(110% 80% at 14% 6%, rgba(127, 231, 214, 0.26), rgba(127, 231, 214, 0) 62%),
-    linear-gradient(140deg, var(--deep-0), var(--deep-1) 78%);
+    radial-gradient(110% 80% at 14% 6%, color-mix(in srgb, var(--scene-glow) 26%, transparent), transparent 62%),
+    linear-gradient(140deg, var(--scene-0), var(--scene-1) 78%);
 }
 
 .hero__water {
@@ -75,7 +75,7 @@
 .hero__mark {
   justify-self: end;
   width: min(100%, 400px);
-  filter: drop-shadow(0 34px 44px rgba(3, 26, 33, 0.42));
+  filter: drop-shadow(0 34px 44px color-mix(in srgb, var(--shade) 42%, transparent));
 }
 
 .hero__mark-svg {

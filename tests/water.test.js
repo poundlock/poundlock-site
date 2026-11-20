@@ -1,6 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mountWater } from '../src/scripts/water.js';
+import { mountWater, hexToRgb } from '../src/scripts/water.js';
+
+test('hexToRgb：调色板里的色值换成着色器要的三个 0 到 1 的数', () => {
+  assert.deepEqual(hexToRgb('#FFFFFF'), [1, 1, 1]);
+  assert.deepEqual(hexToRgb('#000000'), [0, 0, 0]);
+  assert.deepEqual(hexToRgb(' #11606A ').map((v) => Math.round(v * 255)), [17, 96, 106]);
+  assert.deepEqual(hexToRgb('#7fe7d6').map((v) => Math.round(v * 255)), [127, 231, 214]);
+});
+
+test('hexToRgb：读不懂的值是 null，调用方用默认色', () => {
+  for (const value of ['', 'teal', '#FFF', 'rgb(1, 2, 3)', 'var(--scene-0)', undefined, null]) {
+    assert.equal(hexToRgb(value), null, String(value));
+  }
+});
 
 function fakeCanvas(getContext) {
   const listeners = {};

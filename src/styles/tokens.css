@@ -1,31 +1,65 @@
-/* 色、字、间距的变量。各节的样式只用这里的名字。
-   原始色出自图标「梯级」的两版配色（主仓库 design/logo/README.md）。 */
+/* 色、字、间距的变量。各节的样式只用这里的名字，不直接写色值：换一套配色只改这个文件。 */
 
 :root {
-  /* 深色版：底、光、三片水 */
-  --deep-0: #11606A;
-  --deep-1: #08323F;
-  --glow: #7FE7D6;
-  --water-hi-0: #FFFFFF;
-  --mint-hi: #D3F6EC;
-  --water-mid-0: #9AF0DD;
-  --mint-mid: #4FD0BB;
+  /* —— 首屏的水面（着色器和它的静态底）—— */
+  --scene-0: #11606A;
+  --scene-1: #08323F;
+  --scene-glow: #7FE7D6;
+
+  /* —— 水，深色段里的三档，每档上下两端（过闸的八片在它们之间取色）—— */
   --water-lo-0: #3CC4B0;
   --mint-lo: #128C84;
+  --water-mid-0: #9AF0DD;
+  --mint-mid: #4FD0BB;
+  --water-hi-0: #FFFFFF;
+  --mint-hi: #D3F6EC;
 
-  /* 浅色版：底、三片水 */
-  --paper-0: #F8F4EB;
-  --paper-1: #EAE3D5;
-  --blue-hi-0: #2B7AAB;
-  --blue-hi: #17507C;
-  --blue-mid-0: #3A9AA6;
-  --blue-mid: #226F86;
+  /* —— 水，浅色段里的三档 —— */
   --blue-lo-0: #49B6A4;
   --blue-lo: #23877E;
+  --blue-mid-0: #3A9AA6;
+  --blue-mid: #226F86;
+  --blue-hi-0: #2B7AAB;
+  --blue-hi: #17507C;
 
-  /* 字标的两种颜色 */
-  --ink: #13212B;
-  --snow: #F0F6FC;
+  /* —— 深色段：底、字、次要的字、强调、线 —— */
+  --zd-bg: #08323F;
+  --zd-fg: #F0F6FC;
+  --zd-muted: #C2E2DD;
+  --zd-accent: #7FE7D6;
+  --zd-line: #2C7480;
+  /* 面板里亮一点的那一端、过闸画面中间亮的那一带、水面那道波 */
+  --zd-raise: #11606A;
+  --stage-glow: #0D4E5A;
+  --wave: #0E5560;
+  /* 半透明的小面（空闸室、标签、按钮的底）用它调淡 */
+  --tint: #7FE7D6;
+  /* 阴影的颜色 */
+  --shade: #031A21;
+
+  /* —— 浅色段 —— */
+  --zl-bg: #F8F4EB;
+  --zl-bg-2: #EAE3D5;
+  --zl-fg: #13212B;
+  --zl-muted: #4A5B63;
+  --zl-accent: #17507C;
+  --zl-line: #D5CCBA;
+
+  /* —— 主按钮、角色的小标签、「它说的话」那片：深色段上的和浅色段上的 —— */
+  --btn-d-0: #FFFFFF;
+  --btn-d-1: #D3F6EC;
+  --btn-d-fg: #08323F;
+  --btn-d-glow: #7FE7D6;
+  --btn-l-0: #28729F;
+  --btn-l-1: #17507C;
+  --btn-l-fg: #F0F6FC;
+  --btn-l-glow: #17507C;
+  --chip-d-0: #9AF0DD;
+  --chip-d-1: #4FD0BB;
+  --chip-d-fg: #08323F;
+  --chip-l-0: #3A9AA6;
+  --chip-l-1: #226F86;
+  --chip-l-fg: #F0F6FC;
 
   /* 字 */
   --font-sans: "PL Sans", "PL SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
@@ -77,27 +111,36 @@
   --rise: 0;
 }
 
-/* 按 zone 切换的语义色。直接写色值，不引用别的变量：对比度的测试要读它们。 */
-[data-zone="deep"] {
-  --bg: #08323F;
-  --fg: #F0F6FC;
-  --muted: #C2E2DD;
-  --accent: #7FE7D6;
-  --line: #2C7480;
+/* 按所在的段切换的语义色。.on-deep / .on-light 给嵌在别的段里的块用（浅色段里的深色面板、过闸里水面以上那一层）。 */
+[data-zone="deep"],
+[data-zone="rise"],
+.on-deep {
+  --bg: var(--zd-bg);
+  --fg: var(--zd-fg);
+  --muted: var(--zd-muted);
+  --accent: var(--zd-accent);
+  --line: var(--zd-line);
+  --btn-0: var(--btn-d-0);
+  --btn-1: var(--btn-d-1);
+  --btn-fg: var(--btn-d-fg);
+  --btn-glow: var(--btn-d-glow);
+  --chip-0: var(--chip-d-0);
+  --chip-1: var(--chip-d-1);
+  --chip-fg: var(--chip-d-fg);
 }
 
-[data-zone="rise"] {
-  --bg: #08323F;
-  --fg: #F0F6FC;
-  --muted: #C2E2DD;
-  --accent: #7FE7D6;
-  --line: #2C7480;
-}
-
-[data-zone="light"] {
-  --bg: #F8F4EB;
-  --fg: #13212B;
-  --muted: #4A5B63;
-  --accent: #17507C;
-  --line: #D5CCBA;
+[data-zone="light"],
+.on-light {
+  --bg: var(--zl-bg);
+  --fg: var(--zl-fg);
+  --muted: var(--zl-muted);
+  --accent: var(--zl-accent);
+  --line: var(--zl-line);
+  --btn-0: var(--btn-l-0);
+  --btn-1: var(--btn-l-1);
+  --btn-fg: var(--btn-l-fg);
+  --btn-glow: var(--btn-l-glow);
+  --chip-0: var(--chip-l-0);
+  --chip-1: var(--chip-l-1);
+  --chip-fg: var(--chip-l-fg);
 }

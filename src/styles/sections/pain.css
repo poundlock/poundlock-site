@@ -32,8 +32,8 @@
   font-size: var(--text-4);
   font-weight: 600;
   line-height: 1.45;
-  color: var(--deep-1);
-  background: linear-gradient(180deg, var(--water-hi-0), var(--mint-hi));
+  color: var(--btn-fg);
+  background: linear-gradient(180deg, var(--btn-0), var(--btn-1));
 }
 
 .pain__truth {

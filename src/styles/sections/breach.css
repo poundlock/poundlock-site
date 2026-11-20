@@ -3,11 +3,6 @@
    脚本接管以后（data-breach-live）：左边是六个可以点的办法，右边是闸门和它说的话。 */
 
 .breach__panel {
-  --bg: #08323F;
-  --fg: #F0F6FC;
-  --muted: #C2E2DD;
-  --accent: #7FE7D6;
-  --line: #2C7480;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
@@ -15,9 +10,9 @@
   border-radius: var(--radius-m);
   color: var(--fg);
   background:
-    radial-gradient(90% 70% at 12% 0%, rgba(127, 231, 214, 0.16), rgba(127, 231, 214, 0) 60%),
-    linear-gradient(150deg, var(--deep-0), var(--deep-1) 62%);
-  box-shadow: 0 30px 60px -36px rgba(8, 50, 63, 0.7);
+    radial-gradient(90% 70% at 12% 0%, color-mix(in srgb, var(--tint) 16%, transparent), transparent 60%),
+    linear-gradient(150deg, var(--zd-raise), var(--bg) 62%);
+  box-shadow: 0 30px 60px -36px color-mix(in srgb, var(--shade) 70%, transparent);
   /* clip 而不是 hidden：hidden 会让里面的 sticky 失效（手机上那张图要粘在顶上）。 */
   overflow: clip;
 }
@@ -48,7 +43,7 @@
   font-weight: 600;
   line-height: 1.4;
   color: var(--fg);
-  background: rgba(127, 231, 214, 0.08);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
   box-shadow: 0 0 0 1px var(--line) inset;
   cursor: pointer;
   transition: background 180ms ease, box-shadow 180ms ease, color 180ms ease;
@@ -69,7 +64,7 @@
 }
 
 .breach__button:hover {
-  background: rgba(127, 231, 214, 0.16);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   box-shadow: 0 0 0 1px var(--accent) inset;
 }
 
@@ -78,13 +73,13 @@
 }
 
 .breach__button[aria-pressed="true"] {
-  color: var(--deep-1);
-  background: linear-gradient(180deg, var(--water-mid-0), var(--mint-mid));
+  color: var(--chip-fg);
+  background: linear-gradient(180deg, var(--chip-0), var(--chip-1));
   box-shadow: none;
 }
 
 .breach__button[aria-pressed="true"]::before {
-  background: var(--deep-1);
+  background: var(--chip-fg);
 }
 
 .breach__says {
@@ -186,7 +181,7 @@
 .breach[data-breach-live] .breach__scene {
   display: block;
   border-radius: var(--radius-s);
-  background: rgba(3, 26, 33, 0.35);
+  background: color-mix(in srgb, var(--shade) 35%, transparent);
   overflow: hidden;
 }
 
@@ -198,13 +193,13 @@
 }
 
 .breach__shell {
-  fill: rgba(127, 231, 214, 0.07);
-  stroke: rgba(127, 231, 214, 0.3);
+  fill: color-mix(in srgb, var(--tint) 7%, transparent);
+  stroke: color-mix(in srgb, var(--tint) 30%, transparent);
   stroke-width: 1.5;
 }
 
 .breach__gate {
-  fill: var(--glow);
+  fill: var(--accent);
   transform-box: fill-box;
   transform-origin: center top;
   transform: scaleY(0);
@@ -217,7 +212,7 @@
 
 .breach__ring {
   fill: none;
-  stroke: var(--glow);
+  stroke: var(--accent);
   stroke-width: 2;
   opacity: 0;
   transform-box: fill-box;
@@ -226,7 +221,7 @@
 
 .breach__svg .boat__hull,
 .breach__svg .boat__sail {
-  fill: var(--snow);
+  fill: var(--fg);
 }
 
 .breach[data-breach-live] .breach__out {
@@ -237,7 +232,7 @@
   padding: var(--space-3) var(--space-4);
   border-left: 4px solid var(--accent);
   border-radius: 0 var(--radius-s) var(--radius-s) 0;
-  background: rgba(127, 231, 214, 0.08);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
   font-size: var(--text-3);
   line-height: 1.65;
 }
@@ -279,8 +274,8 @@
   }
 
   .breach[data-breach-live] .breach__scene {
-    background: #062A35;
-    box-shadow: 0 14px 24px -14px rgba(3, 26, 33, 0.9);
+    background: color-mix(in srgb, var(--bg) 82%, #000);
+    box-shadow: 0 14px 24px -14px color-mix(in srgb, var(--shade) 90%, transparent);
   }
 
   .breach[data-breach-live] .breach__svg {
@@ -296,7 +291,7 @@
     padding: var(--space-3);
     border-left: 4px solid var(--accent);
     border-radius: 0 var(--radius-s) var(--radius-s) 0;
-    background: rgba(127, 231, 214, 0.08);
+    background: color-mix(in srgb, var(--tint) 8%, transparent);
     color: var(--fg);
   }
 

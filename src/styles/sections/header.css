@@ -4,8 +4,8 @@
   /* 不做渐变：过闸快结束、水面退到页头后面的那一刻（--rise 到 0.94）一下子从深换到浅。
      慢慢混的话，中间有一段字和底都是灰的，看不清。 */
   --header-flip: clamp(0, (var(--rise) - 0.94) * 1000, 1);
-  --header-ink: color-mix(in srgb, var(--snow), var(--ink) calc(var(--header-flip) * 100%));
-  --header-ground: color-mix(in srgb, var(--deep-1), var(--paper-0) calc(var(--header-flip) * 100%));
+  --header-ink: color-mix(in srgb, var(--zd-fg), var(--zl-fg) calc(var(--header-flip) * 100%));
+  --header-ground: color-mix(in srgb, var(--zd-bg), var(--zl-bg) calc(var(--header-flip) * 100%));
   position: absolute;
   inset: 0 0 auto 0;
   z-index: 50;

@@ -11,16 +11,16 @@ main > section,
 
 /* 深色段默认是闸底的纯色，相邻的深色节之间不留接缝；首屏和页尾自己加渐变。 */
 [data-zone="deep"] {
-  background: var(--deep-1);
+  background: var(--bg);
 }
 
-/* 过闸一节的默认样子（没有脚本、减少动效）：一条自上而下从深到浅的渐变。 */
+/* 过闸一节的默认样子（没有脚本、减少动效）：和深色段一样的底。 */
 [data-zone="rise"] {
-  background: linear-gradient(180deg, var(--deep-1), var(--deep-0) 30%, var(--paper-1) 82%, var(--paper-0));
+  background: var(--bg);
 }
 
 [data-zone="light"] {
-  background: var(--paper-0);
+  background: var(--bg);
 }
 
 /* 浅色段里相邻两节之间不重复留两份白。 */

@@ -4,9 +4,9 @@ import { starIcon } from './icons.js';
 // 图标「梯级」的三片，画法和 design/logo 里的一致（深色版）。每片各自一组，首屏加载时依次升到位。
 const mark = raw(`<svg class="hero__mark-svg" viewBox="96 16 320 440" aria-hidden="true" focusable="false">
   <defs>
-    <linearGradient id="hero-lo" gradientUnits="userSpaceOnUse" x1="0" y1="146" x2="0" y2="446"><stop offset="0" stop-color="#3CC4B0"/><stop offset="1" stop-color="#128C84"/></linearGradient>
-    <linearGradient id="hero-mid" gradientUnits="userSpaceOnUse" x1="0" y1="106" x2="0" y2="406"><stop offset="0" stop-color="#9AF0DD"/><stop offset="1" stop-color="#4FD0BB"/></linearGradient>
-    <linearGradient id="hero-hi" gradientUnits="userSpaceOnUse" x1="0" y1="66" x2="0" y2="366"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#D3F6EC"/></linearGradient>
+    <linearGradient id="hero-lo" gradientUnits="userSpaceOnUse" x1="0" y1="146" x2="0" y2="446"><stop offset="0" style="stop-color:var(--water-lo-0)"/><stop offset="1" style="stop-color:var(--mint-lo)"/></linearGradient>
+    <linearGradient id="hero-mid" gradientUnits="userSpaceOnUse" x1="0" y1="106" x2="0" y2="406"><stop offset="0" style="stop-color:var(--water-mid-0)"/><stop offset="1" style="stop-color:var(--mint-mid)"/></linearGradient>
+    <linearGradient id="hero-hi" gradientUnits="userSpaceOnUse" x1="0" y1="66" x2="0" y2="366"><stop offset="0" style="stop-color:var(--water-hi-0)"/><stop offset="1" style="stop-color:var(--mint-hi)"/></linearGradient>
   </defs>
   <path class="slice slice--lo" d="M199 157.25A150 150 0 0 0 199 434.75Z" fill="url(#hero-lo)"/>
   <path class="slice slice--mid" d="M213 112.3A150 150 0 0 1 299 112.3V399.7A150 150 0 0 1 213 399.7Z" fill="url(#hero-mid)"/>

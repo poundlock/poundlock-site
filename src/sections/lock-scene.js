@@ -69,23 +69,22 @@ function build() {
 
 export const geometry = build();
 
-// 每片水的颜色：从最低一片的青绿，过中间的浅绿，到最高一片的白。取图标深色版三片的上下两端。
-// 两套：deep 是水下（图标深色版），light 是升出水面以后（图标浅色版，最高一片是最深的蓝）。
+// 每片水的颜色：在调色板的三档之间取——最低一片、中间、最高一片，每档上下两端。
+// 这里只写变量名，色值在 tokens.css 里：换配色不用动这张图。
+// 两套：deep 是水下，light 是升出水面以后。
 const TONES = {
-  deep: { tops: ['#3CC4B0', '#9AF0DD', '#FFFFFF'], bottoms: ['#128C84', '#4FD0BB', '#D3F6EC'] },
-  light: { tops: ['#49B6A4', '#3A9AA6', '#2B7AAB'], bottoms: ['#23877E', '#226F86', '#17507C'] },
+  deep: { tops: ['--water-lo-0', '--water-mid-0', '--water-hi-0'], bottoms: ['--mint-lo', '--mint-mid', '--mint-hi'] },
+  light: { tops: ['--blue-lo-0', '--blue-mid-0', '--blue-hi-0'], bottoms: ['--blue-lo', '--blue-mid', '--blue-hi'] },
 };
 
-function mix(a, b, t) {
-  const pa = [1, 3, 5].map((k) => parseInt(a.slice(k, k + 2), 16));
-  const pb = [1, 3, 5].map((k) => parseInt(b.slice(k, k + 2), 16));
-  return '#' + pa.map((v, k) => Math.round(v + (pb[k] - v) * t).toString(16).padStart(2, '0')).join('').toUpperCase();
-}
-
-function ramp(colors, t) {
-  const scaled = t * (colors.length - 1);
-  const i = Math.min(colors.length - 2, Math.floor(scaled));
-  return mix(colors[i], colors[i + 1], scaled - i);
+// 在三档之间按 t（0 到 1）取色，写成 CSS 的 color-mix。
+function ramp(names, t) {
+  const scaled = t * (names.length - 1);
+  const i = Math.min(names.length - 2, Math.floor(scaled));
+  const share = Math.round((scaled - i) * 100);
+  if (share === 0) return `var(${names[i]})`;
+  if (share === 100) return `var(${names[i + 1]})`;
+  return `color-mix(in srgb, var(${names[i]}), var(${names[i + 1]}) ${share}%)`;
 }
 
 // tone：'deep' 是水下那一张（脚本驱动的就是它），'light' 是水面以上那一张（静态，升满了的样子）。
@@ -100,7 +99,7 @@ export function renderScene({ tone = 'deep' } = {}) {
       const t = i / last;
       return (
         `<linearGradient id="${id('water', i)}" gradientUnits="userSpaceOnUse" x1="0" y1="${slab.top}" x2="0" y2="${slab.bottom}">` +
-        `<stop offset="0" stop-color="${ramp(tops, t)}"/><stop offset="1" stop-color="${ramp(bottoms, t)}"/></linearGradient>` +
+        `<stop offset="0" style="stop-color:${ramp(tops, t)}"/><stop offset="1" style="stop-color:${ramp(bottoms, t)}"/></linearGradient>` +
         `<clipPath id="${id('clip', i)}"><path d="${slab.path}"/></clipPath>`
       );
     })

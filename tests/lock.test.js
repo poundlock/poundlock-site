@@ -52,8 +52,10 @@ test('水面以上那一张用另一套颜色，id 不和水下那一张撞', ()
   assert.equal(ids(deep).length, 16, '八个渐变加八个裁剪');
   assert.equal(ids(light).length, 16);
   assert.equal(ids(deep).filter((id) => ids(light).includes(id)).length, 0);
-  assert.ok(light.includes('#17507C') && !light.includes('#FFFFFF'));
-  assert.ok(deep.includes('#FFFFFF'));
+  // 色值不写在图里，只写调色板的变量名：水下那一张用 --water-* / --mint-*，水面以上用 --blue-*。
+  assert.ok(light.includes('var(--blue-hi)') && !light.includes('--water-hi-0'));
+  assert.ok(deep.includes('var(--water-hi-0)') && !deep.includes('--blue-hi'));
+  assert.doesNotMatch(deep + light, /#[0-9A-Fa-f]{6}/, '场景里不该写死色值');
 });
 
 test('水尺上相邻两级的刻度隔得开', () => {
