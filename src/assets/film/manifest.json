@@ -1,0 +1,18 @@
+{
+  "sets": {
+    "wide": {
+      "dir": "wide",
+      "ext": "webp",
+      "count": 240,
+      "width": 1920,
+      "height": 1440
+    },
+    "tall": {
+      "dir": "tall",
+      "ext": "webp",
+      "count": 120,
+      "width": 864,
+      "height": 1152
+    }
+  }
+}
