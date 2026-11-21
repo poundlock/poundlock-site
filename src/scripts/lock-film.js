@@ -45,9 +45,12 @@ export function coverRect(fw, fh, vw, vh, ax = 0.5, ay = 0.5) {
   return { x, y, w, h };
 }
 
-// 视口是横的用横版，竖的用竖版；只有一版就用那一版。
+// 竖版是给手机缩过的小图：只有又竖又窄（手机）才用它。横着的视口、够宽的竖屏（竖着的平板、竖着摆的大屏）
+// 都用横版——横版是整幅 4:3 的母版，竖屏上取它中间一条，比把竖版放大清楚。只有一版就用那一版。
+const PHONE_MAX = 600;
+
 export function pickSet(sets, vw, vh) {
-  const order = vw >= vh ? ['wide', 'tall'] : ['tall', 'wide'];
+  const order = vw < vh && vw <= PHONE_MAX ? ['tall', 'wide'] : ['wide', 'tall'];
   return order.find((name) => sets && sets[name]) ?? null;
 }
 

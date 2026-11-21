@@ -63,11 +63,15 @@ test('coverRect：竖向放不下「中心落在指定位置」时，贴边，�
   assert.ok(r.y <= 0.5 && r.y + r.h >= 1000 - 0.5, JSON.stringify(r));
 });
 
-test('pickSet：横屏用横版，竖屏用竖版；只有一版就用那一版', () => {
+test('pickSet：横屏用横版，手机竖屏用竖版，够宽的竖屏还是横版；只有一版就用那一版', () => {
   const sets = { wide: { width: 1920, height: 1080 }, tall: { width: 1080, height: 1440 } };
   assert.equal(pickSet(sets, 1440, 900), 'wide');
   assert.equal(pickSet(sets, 390, 844), 'tall');
   assert.equal(pickSet(sets, 1000, 1000), 'wide');
+  // 竖着的平板、竖着摆的大屏：虽然是竖的，但够宽，用横版（竖版是给手机缩过的，放大了发虚）。
+  assert.equal(pickSet(sets, 820, 1180), 'wide');
+  assert.equal(pickSet(sets, 1080, 1920), 'wide');
+  assert.equal(pickSet(sets, 600, 900), 'tall');
   assert.equal(pickSet({ wide: sets.wide }, 390, 844), 'wide');
   assert.equal(pickSet({}, 390, 844), null);
 });

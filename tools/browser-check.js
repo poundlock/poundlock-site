@@ -191,7 +191,7 @@ export const CHECKS = [
   {
     // 影片版的过闸：画布上画着东西，滚到哪画哪一帧；横屏用横版、竖屏用竖版；平面那张图收起来；滚到头天亮。
     name: 'lock-film',
-    viewports: ['1440', '360'],
+    viewports: ['1440', '820', '360'],
     async run({ page, url, shot, uncaught }) {
       await page.goto(url, { waitUntil: 'load' });
       await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 15000 });
@@ -214,7 +214,8 @@ export const CHECKS = [
             lit: sum / (32 * 32 * 3),
             flat: getComputedStyle(root.querySelector('.lock__water .lock__scene')).visibility,
             day: root.hasAttribute('data-day'),
-            wide: innerWidth >= innerHeight,
+            // 和 lock-film.js 的 pickSet 一个规则：又竖又窄（手机）才用竖版。
+            wide: !(innerWidth < innerHeight && innerWidth <= 600),
             // 当前这一段的说明压到底下的产物清单上多少像素（不压是负数或 0）。
             overlap: root.querySelector('.lock__water .chamber[data-current]').getBoundingClientRect().bottom - root.querySelector('.lock__water .lock__ledger').getBoundingClientRect().top,
           };
@@ -240,7 +241,7 @@ export const CHECKS = [
       let s = await state();
       expect(s.film, '影片版的过闸没起来');
       expect(s.display === 'block' && s.opacity > 0.9, `画布没显示出来：${JSON.stringify(s)}`);
-      expect(s.set === (s.wide ? 'wide' : 'tall'), `视口是${s.wide ? '横' : '竖'}的，用的却是 ${s.set} 这一套`);
+      expect(s.set === (s.wide ? 'wide' : 'tall'), `这个视口该用${s.wide ? '横版' : '竖版'}，用的却是 ${s.set} 这一套`);
       expect(Math.abs(s.frame - Math.round(0.3 * (s.count - 1))) <= 1, `滚到 0.3，画的是第 ${s.frame} 帧（共 ${s.count} 帧）`);
       expect(s.lit > 2, `画布是黑的：${JSON.stringify(s)}`);
       expect(s.flat === 'hidden', '影片起来了，平面那张图却没收起来');
@@ -556,6 +557,115 @@ export const CHECKS = [
       await page.evaluate(() => document.activeElement && document.activeElement.blur());
       const cleared = await page.evaluate(() => document.querySelectorAll('#roster [data-active]').length);
       expect(cleared === 0, `焦点移开以后还有 ${cleared} 处亮着`);
+    },
+  },
+  {
+    // 窄屏和大字号下不挤破：标了 data-fit 的字（按钮、角色名、阶段名）没有被裁掉，页面没有横向滚动。
+    // 两种情形：360 宽；720 宽、根字号放大到 200%（相当于访客把浏览器的字调到最大）。
+    name: 'fit',
+    viewports: ['360'],
+    async run({ page, url }) {
+      for (const { width, height, font } of [
+        { width: 360, height: 740, font: '' },
+        { width: 720, height: 900, font: '200%' },
+      ]) {
+        await page.setViewportSize({ width, height });
+        await page.goto(url, { waitUntil: 'load' });
+        await page.evaluate((size) => {
+          document.documentElement.style.fontSize = size;
+        }, font);
+        await page.waitForTimeout(400);
+        const result = await page.evaluate(() => ({
+          clipped: [...document.querySelectorAll('[data-fit]')]
+            .filter((el) => el.getClientRects().length && el.scrollWidth > el.clientWidth + 1)
+            .map((el) => `${el.textContent.trim().slice(0, 24)}（${el.scrollWidth} > ${el.clientWidth}）`),
+          scrollWidth: document.documentElement.scrollWidth,
+          innerWidth: window.innerWidth,
+        }));
+        const where = `${width} 宽${font ? `、字号 ${font}` : ''}`;
+        expect(result.clipped.length === 0, `${where}：这些字被裁掉了：${result.clipped.join('；')}`);
+        expect(result.scrollWidth <= result.innerWidth + 1, `${where}：横向溢出，scrollWidth ${result.scrollWidth} > innerWidth ${result.innerWidth}`);
+      }
+    },
+  },
+  {
+    // 只用键盘走完整页：每一个停下来的地方都在视口里、没被固定的页头盖住，而且看得见焦点。
+    name: 'focus',
+    engines: ['chromium', 'firefox'],
+    viewports: ['1440', '360'],
+    async run({ page, url }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForFunction(() => document.querySelector('#roster')?.dataset.rosterLive === 'true', null, { timeout: 8000 });
+      const stops = [];
+      for (let i = 0; i < 80; i++) {
+        await page.keyboard.press('Tab');
+        // 焦点跳到视口外的东西上时，页面是平滑滚过去的：等它滚稳了再量。
+        await page.evaluate(
+          () =>
+            new Promise((resolve) => {
+              let last = -1;
+              let calm = 0;
+              let ticks = 0;
+              const timer = setInterval(() => {
+                calm = scrollY === last ? calm + 1 : 0;
+                last = scrollY;
+                if (calm >= 2 || ++ticks > 40) {
+                  clearInterval(timer);
+                  resolve();
+                }
+              }, 80);
+            }),
+        );
+        const stop = await page.evaluate(() => {
+          const el = document.activeElement;
+          if (!el || el === document.body) return null;
+          const rect = el.getBoundingClientRect();
+          const style = getComputedStyle(el);
+          // 元素中心那一点上，最上面的是不是它自己（或者它里面的东西）：不是，就是被别的盖住了。
+          const cx = Math.min(innerWidth - 1, Math.max(0, rect.left + rect.width / 2));
+          const cy = Math.min(innerHeight - 1, Math.max(0, rect.top + Math.min(rect.height, innerHeight) / 2));
+          const top = document.elementFromPoint(cx, cy);
+          return {
+            what: (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 28),
+            key: `${el.tagName}|${el.className}|${el.getAttribute('href') ?? ''}|${el.dataset.roleNode ?? ''}|${el.dataset.attempt ?? ''}`,
+            inView: rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth,
+            covered: !(top && (el === top || el.contains(top) || top.contains(el))),
+            ring: style.outlineStyle !== 'none' || style.boxShadow !== 'none',
+          };
+        });
+        if (!stop) break;
+        if (stops.length && stop.key === stops[0].key) break;
+        stops.push(stop);
+      }
+      expect(stops.length >= 20, `按 Tab 只停了 ${stops.length} 处，页面上能点的东西不止这些`);
+      const lost = stops.filter((stop) => !stop.inView).map((stop) => stop.what);
+      const covered = stops.filter((stop) => stop.inView && stop.covered).map((stop) => stop.what);
+      const bare = stops.filter((stop) => !stop.ring).map((stop) => stop.what);
+      expect(lost.length === 0, `聚焦以后不在视口里：${lost.join('；')}`);
+      expect(covered.length === 0, `聚焦以后被别的东西盖住了：${covered.join('；')}`);
+      expect(bare.length === 0, `聚焦以后看不见焦点：${bare.join('；')}`);
+    },
+  },
+  {
+    // 换语言落在同一节：在「安装」那一节点页头的语言切换，到的是另一种语言的「安装」。
+    name: 'lang-switch',
+    viewports: ['1440', '360'],
+    async run({ page, url, lang }) {
+      await page.goto(`${url}#install`, { waitUntil: 'load' });
+      await page.waitForFunction(() => document.querySelector('#roster')?.dataset.rosterLive === 'true', null, { timeout: 8000 });
+      await page.waitForTimeout(400);
+      await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.click('.site-header [data-lang-switch]')]);
+      await page.waitForTimeout(600);
+      const state = await page.evaluate(() => ({
+        lang: document.documentElement.lang,
+        hash: location.hash,
+        top: Math.round(document.getElementById('install').getBoundingClientRect().top),
+        height: innerHeight,
+      }));
+      const want = lang.code === 'zh' ? 'en' : 'zh';
+      expect(state.lang.toLowerCase().startsWith(want), `从 ${lang.code} 切过去，页面的语言是 ${state.lang}`);
+      expect(state.hash === '#install', `切过去以后地址上的锚点是「${state.hash}」，应当是 #install`);
+      expect(state.top >= -4 && state.top < state.height * 0.5, `切过去以后「安装」这一节的顶边在 ${state.top}，不在视口上半截`);
     },
   },
   {

@@ -32,6 +32,7 @@ const FEATURES = [
   ['./breach.js', 'initBreach', '#breach'],
   ['./roster.js', 'initRoster', '#roster'],
   ['./copy-button.js', 'initCopyButtons', '#install'],
+  ['./lang-switch.js', 'initLangSwitch', 'body'],
 ];
 
 async function start(path, init, selector, anime) {
@@ -43,6 +44,32 @@ async function start(path, init, selector, anime) {
   } catch (error) {
     console.warn(`[poundlock] ${path} 没起来，这一块保持静态。`, error);
   }
+}
+
+// 访客自己动过页面没有（滚轮、触摸、按键、点按）。
+let touched = false;
+for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) {
+  window.addEventListener(
+    type,
+    () => {
+      touched = true;
+    },
+    { once: true, passive: true },
+  );
+}
+
+// 带着锚点打开页面时，浏览器在各模块接管之前就滚到了那一节；接管以后有的节高度变了
+// （闯闸那块面板从一张清单变成左右两栏），有的浏览器（Safari）不会跟着调滚动位置，落点就偏了。
+// 所以接管完补一次定位。访客自己已经动过页面就不补，不跟他抢。
+function reanchor() {
+  if (touched || location.hash.length < 2) return;
+  let target = null;
+  try {
+    target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  } catch {
+    return;
+  }
+  if (target) target.scrollIntoView({ block: 'start' });
 }
 
 async function boot() {
@@ -70,6 +97,7 @@ async function boot() {
   }
 
   await Promise.all(FEATURES.map(([path, init, selector]) => start(path, init, selector, anime)));
+  reanchor();
 }
 
 boot();

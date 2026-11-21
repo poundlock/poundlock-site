@@ -1,8 +1,10 @@
 // 把渲染出来的母版画面（PNG，1920×1440）压成页面用的两套 WebP，写进 src/assets/film/，并写清单 manifest.json。
 //   node tools/film/encode.mjs --from .shots/film/master [--quality 72]
 //
-// 母版是 4:3 的，一次渲染裁出两套：
-//   wide  横版，取中间的 1920×1080，每一帧都要——给横着的视口
+// 母版是 4:3 的，一次渲染出两套：
+//   wide  横版，就是整幅母版（1920×1440），每一帧都要——给横着的视口。
+//         不裁成 16:9：视口比 16:9 高的时候（竖着摆的大屏、分屏的窗口）要用到上下那两条，裁掉了就只能放大、发虚；
+//         视口是 16:9 或者更扁的时候，页面自己只取中间那一截。
 //   tall  竖版，取中间的 1080×1440 再缩到 864×1152，隔一帧取一帧——给手机，省一半流量
 // 要用 ffmpeg（带 libwebp）。
 import { spawnSync } from 'node:child_process';
@@ -32,11 +34,10 @@ const probe = spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-s
 const [masterW, masterH] = probe.stdout.trim().split(',').map(Number);
 if (!masterW || !masterH) throw new Error('读不出母版的尺寸');
 const even = (n) => Math.round(n / 2) * 2;
-const wideH = even((masterW * 9) / 16);
 const tallW = even((masterH * 3) / 4);
 const tallScale = Math.min(1, 864 / tallW);
 const SETS = [
-  { name: 'wide', filter: `crop=${masterW}:${wideH}:0:${even((masterH - wideH) / 2)}`, width: masterW, height: wideH, step: 1 },
+  { name: 'wide', filter: 'null', width: masterW, height: masterH, step: 1 },
   {
     name: 'tall',
     filter: `crop=${tallW}:${masterH}:${even((masterW - tallW) / 2)}:0,scale=${even(tallW * tallScale)}:${even(masterH * tallScale)}:flags=lanczos`,
