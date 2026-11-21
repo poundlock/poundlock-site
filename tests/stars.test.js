@@ -103,3 +103,19 @@ test('mountStars(null) 不动页面', () => {
     assert.equal(element.textContent, '');
   }
 });
+
+// 仓库刚公开时星标数是 0：按钮旁边挂一个「0」只会减分，等有了第一颗再显示。
+test('mountStars(0) 不显示数字，有了第一颗才显示', () => {
+  const none = fakeDoc(2);
+  mountStars(none, 0);
+  for (const element of none.elements) {
+    assert.equal(element.hidden, true);
+    assert.equal(element.textContent, '');
+  }
+  const one = fakeDoc(2);
+  mountStars(one, 1);
+  for (const element of one.elements) {
+    assert.equal(element.hidden, false);
+    assert.equal(element.textContent, '1');
+  }
+});

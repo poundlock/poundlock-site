@@ -52,8 +52,9 @@ export async function loadStars({ api, fetchImpl = globalThis.fetch, storage = d
 }
 
 // 给页面上每个放数字的位置填上并显示；n 是 null 时什么都不动。
+// 0 也不显示：仓库刚公开时按钮旁边挂一个「0」只会减分，有了第一颗再显示。
 export function mountStars(doc, n) {
-  if (n === null || n === undefined) return;
+  if (n === null || n === undefined || n === 0) return;
   for (const element of doc.querySelectorAll('[data-star-count]')) {
     element.textContent = formatStars(n);
     element.hidden = false;
