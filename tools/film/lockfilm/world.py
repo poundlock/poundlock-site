@@ -123,7 +123,11 @@ def build(scene, mats):
 
     cam = bpy.data.cameras.new("camera")
     cam.lens = 27.0
-    cam.sensor_width = 36.0
+    # 画幅只留「36 毫米宽的 4:3 画面」的左边 82%：页面把船摆在偏右（61%）的地方、左边留给字，
+    # 右边那 18% 在宽屏版式里从来不露出来，渲了也是白渲，还逼着页面把画面多放大 22% 才摆得下。
+    # 做法：感光面裁窄（焦距、光圈不动，透视和景深都不变），画幅整个往左偏——镜头正对着的船落在画面宽度的 61% 处。
+    cam.sensor_width = 36.0 * FRAME_KEEP
+    cam.shift_x = -(1.0 - FRAME_KEEP) / (2.0 * FRAME_KEEP)
     cam.clip_start = 0.1
     cam.clip_end = 2000.0
     cam.dof.use_dof = True
@@ -165,6 +169,11 @@ def aim(ctl, position, target, focus=None, lens=None, roll=0.0):
     cam.data.dof.focus_distance = (Vector(focus if focus is not None else target) - Vector(position)).length
     if lens:
         cam.data.lens = lens
+
+
+# 镜头的画幅留原来的多少（见 build 里摆镜头的地方）。船在画面宽度上的位置是 0.5 / FRAME_KEEP，
+# 压片脚本（tools/film/encode.mjs 的 FOCUS_X）用的是同一个数，改这里要一起改。
+FRAME_KEEP = 0.82
 
 
 def compositor(scene, bloom=0.45):
