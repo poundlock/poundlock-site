@@ -12,7 +12,7 @@
 //       wide   2880×2160  整幅母版缩小——给一般的大屏、比 16:9 高的窗口
 //       mid    1920×1440  整幅母版缩小——给小一些的屏
 //       phone  1344×1680  以船为中心裁成 4:5 再缩小——给手机（窄屏版式里画面只占上面一截）
-//   图片（后备）  WebP，浏览器走不了视频那一路时用：wide 1920×1440 每隔 3 帧一张，tall（手机）864×1080 每隔 6 帧一张。
+//   图片（后备）  WebP，浏览器走不了视频那一路时用：wide 1920×1440 每隔 3 帧一张（目录 frames-wide），tall（手机）864×1080 每隔 6 帧一张（目录 frames-tall）。
 // 要用 ffmpeg（带 libx264、libwebp）和 ffprobe。
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, linkSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -97,8 +97,8 @@ try {
     { name: 'phone', width: even(1344 * k), height: even(1680 * k), geometry: `${phoneCrop},${resize(even(1344 * k), even(1680 * k))}`, focus: [0.5, 0.5], crf: 24 },
   ].filter((tier) => !wanted || wanted.split(',').includes(tier.name));
   const SETS = [
-    { name: 'wide', width: even(1920 * k), height: even(1440 * k), step: 3, focus: [FOCUS_X, 0.5] },
-    { name: 'tall', width: even(864 * k), height: even(1080 * k), pre: `${phoneCrop},`, step: 6, focus: [0.5, 0.5] },
+    { name: 'wide', dir: 'frames-wide', width: even(1920 * k), height: even(1440 * k), step: 3, focus: [FOCUS_X, 0.5] },
+    { name: 'tall', dir: 'frames-tall', width: even(864 * k), height: even(1080 * k), pre: `${phoneCrop},`, step: 6, focus: [0.5, 0.5] },
   ];
 
   if (!wanted) rmSync(out, { recursive: true, force: true });
@@ -168,8 +168,10 @@ try {
 
   // ---- 后备的图片 ----
   if (!wanted) {
+    // 图片的目录不能和视频的档重名（有一档也叫 wide）：重名的话后压的会把先压的删掉。
     for (const set of SETS) {
-      const dir = path.join(out, set.name);
+      if (TIERS.some((tier) => tier.name === set.dir)) throw new Error(`图片的目录 ${set.dir} 和视频的一档重名了`);
+      const dir = path.join(out, set.dir);
       rmSync(dir, { recursive: true, force: true });
       mkdirSync(dir, { recursive: true });
       const kept = subsample(count, set.step);
@@ -182,7 +184,7 @@ try {
       const files = readdirSync(dir).sort();
       if (files.length !== kept.length) throw new Error(`${set.name}：应当有 ${kept.length} 张，出来 ${files.length} 张`);
       const bytes = files.reduce((sum, name) => sum + statSync(path.join(dir, name)).size, 0);
-      manifest.sets[set.name] = { dir: set.name, ext: 'webp', step: set.step, count: files.length, width: set.width, height: set.height, focus: set.focus.map(round), bytes };
+      manifest.sets[set.name] = { dir: set.dir, ext: 'webp', step: set.step, count: files.length, width: set.width, height: set.height, focus: set.focus.map(round), bytes };
       console.log(`${set.name}（图片）：${set.width}×${set.height}，${files.length} 张，共 ${mb(bytes)} MB`);
     }
     writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(manifest) + '\n');
