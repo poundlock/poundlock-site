@@ -3,6 +3,8 @@
 #   blender -b --factory-startup --python tools/film/render.py -- --states states.json --out 目录 [选项]
 #
 # 选项：--size 1920x1080  --samples 256  --only 3,7（只渲染这几帧）  --quality 0|1|2（石头的细致程度）
+#       --threshold 0.04（噪点低到这个数就不再多采样）  --order coarse（先每隔八帧渲一遍，再补齐）
+#       --compositor cpu|gpu|off（后期在哪算；量过，占不了多少时间）  --volstep 2（雾的步长；量过，不省时间）
 #       --cam "x,y,z,tx,ty,tz"（不用影片的镜头，自己摆，查场景用）  --lens 27  --blend 文件（把场景存下来）
 #       --resume 1（已经渲染出来的帧跳过：中途断了接着渲）
 import json
@@ -27,7 +29,7 @@ JOURNEY_SECONDS = 96.0  # 整段路按这么长的时间算水面的波动
 
 def options():
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
-    opts = {"size": "1280x720", "samples": "128", "quality": "2", "only": "", "cam": "", "lens": "", "blend": "", "states": "", "out": "", "resume": "", "grass": "1"}
+    opts = {"size": "1280x720", "samples": "128", "quality": "2", "only": "", "cam": "", "lens": "", "blend": "", "states": "", "out": "", "resume": "", "grass": "1", "compositor": "cpu", "threshold": "", "volstep": "", "order": ""}
     for key, value in zip(argv[0::2], argv[1::2]):
         opts[key.lstrip("-")] = value
     return opts
@@ -259,6 +261,20 @@ def apply(scene, built, state):
     world.set_time(scene, built["ctl"], sky_time(state), built["lamps"])
 
 
+def coarse_first(states):
+    """先每隔八帧渲一帧铺满整段（连最后一帧），再补每隔四帧、两帧的，最后补齐。
+    任何时候停下来，手里都是一段完整、只是稀一些的影片；压片时关键帧正好是每隔八帧的那些。"""
+    last = states[-1]["index"] if states else 0
+
+    def rank(state):
+        index = state["index"]
+        if index % 8 == 0 or index == last:
+            return 0
+        return 1 if index % 4 == 0 else 2 if index % 2 == 0 else 3
+
+    return sorted(states, key=lambda state: (rank(state), state["index"]))
+
+
 def main():
     opts = options()
     scene = bpy.context.scene
@@ -267,12 +283,23 @@ def main():
     world.render_settings(scene, width, height, int(opts["samples"]))
     started = time.time()
     built = build(scene, int(opts["quality"]), opts["grass"] != "0")
+    # 后期（柔光、色散）在哪算：cpu、gpu，或者 off（不做后期，量时间用）。
+    if opts["compositor"] == "off":
+        scene.render.use_compositing = False
+    elif opts["compositor"] == "gpu":
+        scene.render.compositor_device = "GPU"
+    if opts["threshold"]:
+        scene.cycles.adaptive_threshold = float(opts["threshold"])
+    if opts["volstep"]:
+        scene.cycles.volume_step_rate = float(opts["volstep"])
     print(f"[film] 场景搭好了，用了 {time.time() - started:.1f} 秒，{len(bpy.data.objects)} 个物体", flush=True)
 
     with open(opts["states"], encoding="utf-8") as handle:
         states = json.load(handle)
     only = {int(v) for v in opts["only"].split(",") if v.strip()} if opts["only"] else None
     os.makedirs(opts["out"], exist_ok=True)
+    if opts["order"] == "coarse":
+        states = coarse_first(states)
     saved = False
     for state in states:
         if only is not None and state["index"] not in only:
