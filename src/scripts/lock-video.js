@@ -122,7 +122,7 @@ export function probeMatches(expected, actual, tolerance = 28) {
 
 const BUDGET = { uhd: 16, wide: 24, mid: 32, phone: 24 }; // 各档缓存几帧解好的画面（一帧 4K 的画面三十多 MB）
 const PARALLEL = 2; // 同时下几个文件
-const PATIENCE = 8000; // 数据到了这么久还没解出头一帧，就算这一路走不通
+const PATIENCE = 15000; // 开了一档这么久还没画出头一帧（索引没到、数据没到、解不出来），就算这一路走不通
 const SLOW_GROUP = 450; // 解一组花了这么多毫秒算慢
 const PHONE_MAX = 600;
 
@@ -203,10 +203,13 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
   };
 
   const pump = (s) => {
-    if (s.dead || !filled) return;
+    if (s.dead || !filled || s.allStarted) return;
     while (s.active < PARALLEL) {
       const next = downloadOrder(s.index.segments.length, segmentOf(s, wanted), direction).find((item) => !s.started.has(`${item.kind}${item.segment}`));
-      if (!next) return;
+      if (!next) {
+        s.allStarted = true;
+        return;
+      }
       s.started.add(`${next.kind}${next.segment}`);
       s.active++;
       const segment = s.index.segments[next.segment];
@@ -226,6 +229,7 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
           if (s.failures >= 4 && !s.ready) fail();
           else win.setTimeout(() => {
             s.started.delete(`${next.kind}${next.segment}`);
+            s.allStarted = false;
             pump(s);
           }, 1500);
         });
@@ -360,7 +364,6 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
     if (!s || s.dead || s.busy || !s.decoder) return;
     const g = planDecode({ target: wanted, direction, gop: s.index.gop, count: s.index.count, budget: s.budget, size: (at) => groupSize(s, at), have: (at) => groupHave(s, at) });
     if (g !== null) {
-      if (!s.ready && !s.watchdog) s.watchdog = win.setTimeout(() => !s.ready && fail(), PATIENCE);
       decodeGroup(s, g);
     } else if (!filled) {
       poster(s);
@@ -392,7 +395,11 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
       busy: false,
       ready: false,
       dead: false,
+      allStarted: false,
     };
+    s.watchdog = win.setTimeout(() => {
+      if (!s.dead && !s.ready) fail();
+    }, PATIENCE);
     (async () => {
       const response = await win.fetch(`${s.base}index.json`, { signal: s.abort.signal });
       if (!response.ok) throw new Error(`index ${response.status}`);

@@ -393,6 +393,8 @@ export const CHECKS = [
       const cases = [
         ['没有 VideoDecoder', (p) => p.addInitScript(() => delete window.VideoDecoder)],
         ['索引取不到', (p) => p.route('**/assets/film/*/index.json', (route) => route.abort())],
+        // 请求发出去了一直不回：等不到头一帧，过十几秒也要退回去，不能一直空着。
+        ['索引一直不回', (p) => p.route('**/assets/film/*/index.json', () => new Promise(() => {}))],
         [
           '解出来的画面不对',
           (p) =>
@@ -415,7 +417,7 @@ export const CHECKS = [
           await fresh.waitForSelector('[data-lock][data-lock-live]', { timeout: 15000 });
           if (!(await hasVideoFilm(fresh))) return;
           await scrollLockTo(fresh, 0.3);
-          await fresh.waitForSelector('[data-lock][data-lock-scene="film"][data-lock-film-ready]', { timeout: 25000 }).catch(() => {});
+          await fresh.waitForSelector('[data-lock][data-lock-scene="film"][data-lock-film-ready]', { timeout: 32000 }).catch(() => {});
           const s = await settleFilm(fresh, { timeout: 15000 });
           expect(s.scene === 'film' && s.kind === 'images', `${what}：应当退回图片那一路，现在是 ${JSON.stringify(s)}`);
           expect(s.lit > 2, `${what}：退回图片以后画布是黑的`);
