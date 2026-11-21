@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { lockStateAt } from '../src/scripts/lock-state.js';
-import { CHAMBER_METRES, LIMITS, filmSchedule, frameAtTable, stepCost } from '../src/scripts/film-schedule.js';
+import { CHAMBER_METRES, LIMITS, filmSchedule, frameAtTable, stepCost, subsample } from '../src/scripts/film-schedule.js';
 
 const table = filmSchedule();
 const states = table.map((progress) => ({ progress, ...lockStateAt(progress) }));
@@ -72,4 +72,12 @@ test('frameAtTable：表上的点取到自己，夹在中间取近的，正中�
 
 test('frameAtTable 对真的取帧表：每一帧自己的进度查回来是自己', () => {
   table.forEach((progress, index) => assert.equal(frameAtTable(table, progress), index));
+});
+
+test('subsample：每隔几帧留一帧，最后一帧总留着', () => {
+  assert.deepEqual(subsample(10, 3), [0, 3, 6, 9]);
+  assert.deepEqual(subsample(11, 3), [0, 3, 6, 9, 10]);
+  assert.deepEqual(subsample(5, 1), [0, 1, 2, 3, 4]);
+  assert.deepEqual(subsample(1, 8), [0]);
+  assert.deepEqual(subsample(0, 8), []);
 });

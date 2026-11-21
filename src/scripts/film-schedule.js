@@ -71,3 +71,12 @@ export function frameAtTable(table, progress) {
   }
   return progress - table[lo] < table[hi] - progress ? lo : hi;
 }
+
+// 一共 count 帧，每隔 step 帧留一帧（最后一帧总留着）：留下的是哪几帧。
+// 稀一些的那几套画面（后备的图片、渲到一半先压出来看的）都这样取，压片和页面用同一个函数。
+export function subsample(count, step) {
+  const kept = [];
+  for (let i = 0; i < count; i += step) kept.push(i);
+  if (count > 0 && kept[kept.length - 1] !== count - 1) kept.push(count - 1);
+  return kept;
+}

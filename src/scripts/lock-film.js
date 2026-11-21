@@ -1,7 +1,9 @@
 // 过闸的影片：离线渲染好的一串画面（tools/film/），滚到哪就画哪一帧。
 // 画面有横版、竖版两套；一套有一两百帧，先稀后密地加载——头十几帧到了就能拖，其余的在后面补齐。
-// frameAt、loadOrder、nearestLoaded、coverRect、pickSet 是纯函数，Node 里能直接测。
+// frameAt、loadOrder、nearestLoaded、coverRect、pickSet、setTable 是纯函数，Node 里能直接测。
+// 这一路现在是后备：浏览器能用显卡解视频时走 lock-video.js，走不了才用这里的图片。
 
+import { frameAtTable, subsample } from './film-schedule.js';
 
 // 进度（0 到 1）对应第几帧。
 export function frameAt(progress, count) {
@@ -40,15 +42,21 @@ export function nearestLoaded(index, has, count) {
   return -1;
 }
 
-// 把 fw×fh 的画面铺满 vw×vh 的视口，画面的中心落在视口的 (ax, ay) 处（0 到 1）。
-// 横向照 ax 摆（为此可以把画面放得比「刚好铺满」大）；竖向尽量照 ay，摆不下就贴边，不露底。
-export function coverRect(fw, fh, vw, vh, ax = 0.5, ay = 0.5) {
-  const scale = Math.max(vh / fh, (2 * Math.max(ax, 1 - ax) * vw) / fw);
+// 把 fw×fh 的画面铺满 vw×vh 的视口，画面上的 (fx, fy) 那一点（船；0 到 1，默认是画面正中）落在视口的 (ax, ay) 处。
+// 横向照 ax 摆（为此可以把画面放得比「刚好铺满」大；fx 和 ax 一样时不用多放）；竖向尽量照 ay，摆不下就贴边，不露底。
+export function coverRect(fw, fh, vw, vh, ax = 0.5, ay = 0.5, fx = 0.5, fy = 0.5) {
+  const scale = Math.max(vh / fh, vw / fw, (ax * vw) / (fx * fw), ((1 - ax) * vw) / ((1 - fx) * fw));
   const w = fw * scale;
   const h = fh * scale;
-  const x = ax * vw - w / 2;
-  const y = Math.min(0, Math.max(vh - h, ay * vh - h / 2));
+  const x = Math.min(0, Math.max(vw - w, ax * vw - fx * w));
+  const y = Math.min(0, Math.max(vh - h, ay * vh - fy * h));
   return { x, y, w, h };
+}
+
+// 一套图片各帧的进度：影片的取帧表里每隔 step 帧取一帧（压片时就是这么挑的）。老的清单没有取帧表，返回 null（按进度均匀取）。
+export function setTable(film, set) {
+  if (!film || !Array.isArray(film.progress)) return null;
+  return subsample(film.progress.length, set.step || 1).map((index) => film.progress[index]);
 }
 
 // 竖版是给手机缩过的小图：只有又竖又窄（手机）才用它。横着的视口、够宽的竖屏（竖着的平板、竖着摆的大屏）
@@ -90,13 +98,16 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
   let shown = null;
   let last = null;
   let anchor = { x: 0.5, y: 0.5 };
+  let focus = [0.5, 0.5];
+  let table = null;
   let dead = false;
+  const indexAt = (progress) => (table ? frameAtTable(table, progress) : frameAt(progress, set.count));
 
   const paint = (force) => {
     if (!set) return;
     const index = nearestLoaded(wanted, (i) => loaded.has(i), set.count);
     if (index < 0 || (index === drawn && !force)) return;
-    const rect = coverRect(set.width, set.height, canvas.width, canvas.height, anchor.x, anchor.y);
+    const rect = coverRect(set.width, set.height, canvas.width, canvas.height, anchor.x, anchor.y, focus[0], focus[1]);
     ctx.drawImage(images[index], rect.x, rect.y, rect.w, rect.h);
     drawn = index;
     canvas.dataset.frame = String(index);
@@ -154,6 +165,9 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
     if (next !== name) {
       name = next;
       set = film.sets[name];
+      focus = Array.isArray(set.focus) ? set.focus : [0.5, 0.5];
+      table = setTable(film, set);
+      if (table && table.length !== set.count) table = null;
       generation++;
       images = new Array(set.count);
       loaded = new Set();
@@ -166,7 +180,7 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
       canvas.dataset.filmSet = name;
       pump();
     }
-    if (shown !== null) wanted = frameAt(shown, set.count);
+    if (shown !== null) wanted = indexAt(shown);
     paint(true);
   };
 
@@ -195,7 +209,7 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
       const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
       last = now;
       shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * 7));
-      wanted = frameAt(shown, set.count);
+      wanted = indexAt(shown);
       hurry(now);
       paint(false);
       // 页头固定在最上面，压着这块画面：天亮以后画面顶上是亮的，它换成浅色段的样子。

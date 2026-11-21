@@ -44,8 +44,8 @@ function ledger(t, live) {
 
 export function render(ctx) {
   const { t, base, film } = ctx;
-  // 影片的清单：哪几套画面、各多少帧、多大。没有影片（还没渲染、或者有意不带）就不写，页面用平面的那张图。
-  const filmData = film ? JSON.stringify({ base: `${base}assets/film/`, sets: film.sets }) : null;
+  // 影片的清单（压片脚本写的那份，原样带上）：取帧表、视频的几档、后备的几套图片。没有影片（还没渲染、或者有意不带）就不写，页面用平面的那张图。
+  const filmData = film ? JSON.stringify({ ...film, base: `${base}assets/film/` }) : null;
   const last = stages[stages.length - 1];
   const lastCopy = t.lock.stages[last.id];
   return html`<section id="lock" class="lock" data-section="lock" data-zone="rise" data-lock>

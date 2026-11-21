@@ -1,11 +1,14 @@
 // 过闸：画面停在视口里，滚动推进，八拍，对应 S1 到 S8。
 // 默认的版式是静态的（八个阶段的清单加一张升满了的图）；这里只在系统没要求减少动效时接管。
-// 接管以后有两种画法：先用影片（lock-film.js：离线渲染好的一串画面，滚到哪画哪一帧）；
-// 页面没带影片、访客开了省流量、画面下不来，就用平面的那张图（要动效库）。
+// 接管以后有三种画法，依次往下退：
+//   影片，视频那一路（lock-video.js：H.264，显卡解码，帧最密、画面最清楚）；
+//   影片，图片那一路（lock-film.js：一串 WebP，浏览器解不了视频时用）；
+//   平面的那张图（要动效库）：页面没带影片、访客开了省流量、影片下不来时用。
 // beatAt、progressOf 是纯函数，Node 里能直接测。
 
 import { lockStateAt } from './lock-state.js';
 import { mountFilm } from './lock-film.js';
+import { mountVideo } from './lock-video.js';
 import { STAGE_QUERY } from './stage.js';
 
 export function beatAt(progress, beats = 8) {
@@ -27,7 +30,8 @@ function readFilm(canvas) {
   if (!canvas || !canvas.dataset.film) return null;
   try {
     const film = JSON.parse(canvas.dataset.film);
-    return film && film.sets && Object.keys(film.sets).length ? film : null;
+    const some = (group) => Boolean(group) && Object.keys(group).length > 0;
+    return film && (some(film.sets) || some(film.tiers)) ? film : null;
   } catch {
     return null;
   }
@@ -211,11 +215,21 @@ function openStage(root, anime) {
     show(anime ? mountFlat(root, anime) : null);
   };
 
+  const hasImages = Boolean(film && film.sets && Object.keys(film.sets).length);
+  // 视频那一路走不通（这一档解不了、解出来的画面不对、迟迟不出画面）：换成图片那一路；图片也没有就用平面的图。
+  const toImages = () => {
+    if (scene) scene.destroy();
+    scene = null;
+    const mounted = hasImages ? mountFilm(root, canvas, film, { onFail: toFlat }) : null;
+    if (mounted) show(mounted);
+    else toFlat();
+  };
+
   const mount = () => {
     if (scene) return;
     let mounted = null;
     if (useFilm) {
-      mounted = mountFilm(root, canvas, film, { onFail: toFlat });
+      mounted = mountVideo(root, canvas, film, { onFail: toImages }) || (hasImages ? mountFilm(root, canvas, film, { onFail: toFlat }) : null);
       if (!mounted) root.removeAttribute('data-lock-film');
     }
     if (!mounted && anime) mounted = mountFlat(root, anime);

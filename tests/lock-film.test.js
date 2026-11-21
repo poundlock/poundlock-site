@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { coarseCount, coverRect, frameAt, loadOrder, nearestLoaded, pickSet } from '../src/scripts/lock-film.js';
+import { coarseCount, coverRect, frameAt, loadOrder, nearestLoaded, pickSet, setTable } from '../src/scripts/lock-film.js';
 
 test('frameAt：进度 0 是第一帧，1 是最后一帧，出界的夹住', () => {
   assert.equal(frameAt(0, 240), 0);
@@ -87,4 +87,35 @@ test('coarseCount：头一遍稀的有几帧——每隔十六帧一帧，加上
     assert.ok(head.every((i) => i % 16 === 0 || i === count - 1), `${count} 帧时头一遍里混进了别的帧：${head}`);
     assert.ok(head.includes(0) && head.includes(count - 1));
   }
+});
+
+test('coverRect：画面上指定的那一点（船）落在视口指定的位置，照样铺满、不变形', () => {
+  for (const [fw, fh, vw, vh, ax, ay, fx, fy] of [
+    [3840, 2880, 3840, 1900, 0.61, 0.5, 0.61, 0.5],
+    [2880, 2160, 2329, 1879, 0.61, 0.5, 0.6098, 0.5],
+    [1920, 1440, 700, 540, 0.5, 0.4, 0.6098, 0.5],
+    [1344, 1680, 1170, 1518, 0.5, 0.4, 0.5, 0.5],
+    [3840, 2160, 3456, 2234, 0.61, 0.5, 0.6098, 0.5],
+  ]) {
+    const r = coverRect(fw, fh, vw, vh, ax, ay, fx, fy);
+    assert.ok(r.x <= 0.5 && r.y <= 0.5, `左上没盖住：${JSON.stringify(r)}`);
+    assert.ok(r.x + r.w >= vw - 0.5 && r.y + r.h >= vh - 0.5, `右下没盖住：${JSON.stringify(r)}`);
+    assert.ok(Math.abs(r.w / r.h - fw / fh) < 1e-6, '画面被拉变形了');
+    assert.ok(Math.abs(r.x + fx * r.w - ax * vw) < 0.5, '那一点的横向位置不对');
+  }
+});
+
+test('coverRect：船在画面上的位置和它该落在视口上的位置一样时，不用多放大——4K 宽屏配 3840 宽的画面正好一比一', () => {
+  const r = coverRect(3840, 2880, 3840, 1900, 0.61, 0.5, 0.61, 0.5);
+  assert.ok(Math.abs(r.w - 3840) < 1e-6, `画面被放到了 ${r.w} 宽`);
+  // 对比：船在画面正中、却要摆到 61% 处，就得多放大 22%。
+  assert.ok(coverRect(3840, 2880, 3840, 1900, 0.61, 0.5).w > 3840 * 1.2);
+});
+
+test('setTable：一套图片的进度表——每隔 step 帧取一帧（最后一帧总在）；老清单没有进度表就是 null', () => {
+  const film = { frames: 8, progress: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 1] };
+  assert.deepEqual(setTable(film, { step: 3 }), [0, 0.3, 0.6, 1]);
+  assert.deepEqual(setTable(film, { step: 1 }), film.progress);
+  assert.deepEqual(setTable(film, {}), film.progress);
+  assert.equal(setTable({ sets: {} }, { step: 3 }), null);
 });
