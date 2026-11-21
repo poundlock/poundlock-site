@@ -214,6 +214,9 @@ export const CHECKS = [
             lit: sum / (32 * 32 * 3),
             flat: getComputedStyle(root.querySelector('.lock__water .lock__scene')).visibility,
             day: root.hasAttribute('data-day'),
+            // 读屏读不读得到：不是当前这一段的，也不能用 visibility 或 display 藏掉。
+            hiddenStages: [...root.querySelectorAll('.lock__water .chamber')].filter((el) => getComputedStyle(el).visibility !== 'visible' || getComputedStyle(el).display === 'none').length,
+            hiddenArtifacts: [...root.querySelectorAll('.lock__water .chamber__artifacts')].filter((el) => getComputedStyle(el).display === 'none').length,
             // 和 lock-film.js 的 pickSet 一个规则：又竖又窄（手机）才用竖版。
             wide: !(innerWidth < innerHeight && innerWidth <= 600),
             // 当前这一段的说明压到底下的产物清单上多少像素（不压是负数或 0）。
@@ -246,6 +249,8 @@ export const CHECKS = [
       expect(s.lit > 2, `画布是黑的：${JSON.stringify(s)}`);
       expect(s.flat === 'hidden', '影片起来了，平面那张图却没收起来');
       expect(!s.day, '才到第三拍就天亮了');
+      expect(s.hiddenStages === 0, `有 ${s.hiddenStages} 段被藏得读屏也读不到`);
+      expect(s.hiddenArtifacts === 0, `有 ${s.hiddenArtifacts} 段的产物名读屏读不到`);
       expect(s.overlap <= 1, `这一段的说明压到了产物清单上 ${Math.round(s.overlap)} 像素`);
       await shot('night');
       // 实现那一段（S5）的说明最长：它也不能压到清单上。
@@ -300,7 +305,7 @@ export const CHECKS = [
     // 在过闸中间刷新：场景停在对应的那一拍。
     name: 'lock-reload',
     viewports: ['1440', '360'],
-    async run({ page, url }) {
+    async run({ page, url, engine }) {
       await page.goto(url, { waitUntil: 'load' });
       await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
       await scrollLockTo(page, 0.6);
@@ -314,6 +319,31 @@ export const CHECKS = [
       }));
       expect(state.beat === '4', `刷新后 data-beat 是 ${state.beat}，应当是 4`);
       expect(state.rise > 0.5 && state.rise < 0.7, `刷新后 --rise 是 ${state.rise}`);
+      // 画面也得马上对上：访客已经在这一节里了，不该再等首屏的入场放完，更不该先闪一下平面图的开场。
+      const flashed = await page.evaluate(() => {
+        const root = document.querySelector('[data-lock]');
+        const hasFilm = Boolean(root.querySelector('[data-lock-canvas]').dataset.film);
+        const flat = getComputedStyle(root.querySelector('.lock__water .lock__scene')).visibility;
+        return { hasFilm, flat, scene: root.dataset.lockScene ?? null };
+      });
+      if (flashed.hasFilm) expect(flashed.flat === 'hidden', `刷新后不到一秒，平面图还露着（${flashed.flat}）`);
+      await page.waitForSelector('[data-lock][data-lock-scene]', { timeout: 2000 }).catch(() => {});
+      const mounted = await page.evaluate(() => document.querySelector('[data-lock]').dataset.lockScene ?? null);
+      expect(mounted !== null, '刷新后两秒多了，画面还没挂上');
+
+      // 地址带着锚点（点过「看一趟怎么跑」）再刷新：浏览器恢复到刷新前的位置，不能被拉回这一节的开头。
+      // WebKit 不核：Safari 刷新带锚点的地址时自己就滚去锚点、不恢复原来的位置（查过，页面的脚本没有动滚动），
+      // 那是这个浏览器的行为，在它上面所有网站都这样。
+      if (engine === 'webkit') return;
+      await page.goto(`${url}#lock`, { waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
+      await scrollLockTo(page, 0.6);
+      await page.waitForTimeout(300);
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
+      await page.waitForTimeout(1500);
+      const beat = await page.evaluate(() => document.querySelector('[data-lock]').dataset.beat);
+      expect(beat === '4', `地址带着 #lock 刷新后 data-beat 是 ${beat}，应当还在第五拍（4）`);
     },
   },
   {
@@ -397,10 +427,116 @@ export const CHECKS = [
       await page.waitForFunction(() => [...document.querySelectorAll('[data-star-count]')].every((el) => !el.hidden), null, { timeout: 5000 });
       await page.waitForTimeout(500);
       expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
-      // 模块没起来时，这一节停在第一拍的样子：第一段的名字看得见，其余的在 HTML 里。
-      expect(await page.getByText(t.lock.stages.S1.name, { exact: true }).first().isVisible(), '第一段的名字看不见');
-      const html = await page.content();
-      for (const stage of Object.values(t.lock.stages)) expect(html.includes(stage.name), `HTML 里没有「${stage.name}」`);
+      // 模块没起来时，这一节退回静态的清单：八段的名字都看得见。
+      for (const stage of Object.values(t.lock.stages)) {
+        expect(await page.locator('.lock__water .chamber__name', { hasText: stage.name }).first().isVisible(), `过闸的模块坏了以后，「${stage.name}」看不见`);
+      }
+      const sticky = await page.evaluate(() => getComputedStyle(document.querySelector('.lock__stage')).position);
+      expect(sticky !== 'sticky', '过闸的模块坏了，这一节却还是粘住的舞台');
+    },
+  },
+  {
+    // 入口脚本整个没取到（断网、被拦）：过闸是静态的清单，八段都读得到；页头有底色，字不会压在浅色段上看不清。
+    name: 'main-broken',
+    viewports: ['1440', '360'],
+    async setup({ context }) {
+      await context.route('**/scripts/main.js', (route) => route.abort());
+    },
+    async run({ page, url, t, engine }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForTimeout(600);
+      for (const stage of Object.values(t.lock.stages)) {
+        expect(await page.locator('.lock__water .chamber__name', { hasText: stage.name }).first().isVisible(), `入口脚本没取到，「${stage.name}」看不见`);
+      }
+      const state = await page.evaluate(() => ({
+        sticky: getComputedStyle(document.querySelector('.lock__stage')).position,
+        ground: Number(getComputedStyle(document.querySelector('.site-header'), '::before').opacity),
+        marked: document.documentElement.classList.contains('script-failed'),
+      }));
+      expect(state.sticky !== 'sticky', '入口脚本没取到，过闸却还是粘住的舞台');
+      expect(state.marked, '入口脚本没取到，<html> 上没有标 script-failed（页头的底色靠它）');
+      // 底色的不透明度直接量。WebKit 不量：无头的 WebKit 读带过渡的伪元素，读出来一直是起点的值
+      // （给页头加 data-scrolled 也一样读到 0），量不准；它上面只核上面那个标记。
+      if (engine !== 'webkit') expect(state.ground > 0.5, `入口脚本没取到，固定的页头没有底色（不透明度 ${state.ground}）`);
+    },
+  },
+  {
+    // 矮的视口：小手机、横过来的手机、把浏览器放大到 200% 的窗口。
+    // 放得下就照常演（字不能被裁、不能钻到页头底下、不能压到产物清单上）；放不下就退回静态的清单，八段都读得到。
+    name: 'lock-short',
+    viewports: ['360'],
+    async run({ page, url, t, shot }) {
+      for (const size of [
+        { width: 390, height: 664, mode: 'stage' },
+        { width: 375, height: 600, mode: 'stage', set: 'tall' },
+        { width: 375, height: 548, mode: 'static' },
+        { width: 844, height: 390, mode: 'static' },
+        { width: 720, height: 390, mode: 'static' },
+        { width: 1024, height: 560, mode: 'stage' },
+        { width: 1280, height: 620, mode: 'stage' },
+      ]) {
+        const where = `${size.width}×${size.height}`;
+        await page.setViewportSize({ width: size.width, height: size.height });
+        await page.goto(url, { waitUntil: 'load' });
+        await page.waitForFunction(() => document.querySelector('#roster')?.dataset.rosterLive === 'true', null, { timeout: 8000 });
+        await page.waitForTimeout(300);
+        const mode = await page.evaluate(() => (getComputedStyle(document.querySelector('.lock__stage')).position === 'sticky' ? 'stage' : 'static'));
+        expect(mode === size.mode, `${where}：过闸应当是${size.mode === 'stage' ? '粘住的舞台' : '静态的清单'}，现在是 ${mode}`);
+        if (mode !== size.mode) continue;
+        if (mode === 'static') {
+          for (const stage of Object.values(t.lock.stages)) {
+            expect(await page.locator('.lock__water .chamber__name', { hasText: stage.name }).first().isVisible(), `${where}：静态的清单里「${stage.name}」看不见`);
+          }
+          continue;
+        }
+        // 第一段、实现那一段（字最多）、业务验收那一段（带原话）。
+        for (const fraction of [0.03, 0.56, 0.81]) {
+          await scrollLockTo(page, fraction);
+          await page.waitForTimeout(700);
+          const fit = await page.evaluate(() => {
+            const root = document.querySelector('[data-lock]');
+            const stage = root.querySelector('.lock__stage').getBoundingClientRect();
+            const header = document.querySelector('.site-header').getBoundingClientRect();
+            const current = root.querySelector('.lock__water .chamber[data-current]');
+            const ledger = root.querySelector('.lock__water .lock__ledger');
+            const shown = getComputedStyle(ledger).display !== 'none';
+            // 这一段里看得见的东西（名字、说明、角色）合起来的上下边。
+            const parts = [...current.querySelectorAll('.chamber__head, .chamber__line, .chamber__roles, .chamber__note, .chamber__words')].filter((el) => el.getClientRects().length && getComputedStyle(el).display !== 'none');
+            const top = Math.min(...parts.map((el) => el.getBoundingClientRect().top));
+            const bottom = Math.max(...parts.map((el) => el.getBoundingClientRect().bottom));
+            const floor = shown ? ledger.getBoundingClientRect().top : stage.bottom;
+            return { id: current.dataset.stage, under: Math.round(header.bottom - top), over: Math.round(bottom - floor), set: root.querySelector('[data-lock-canvas]').dataset.filmSet ?? null };
+          });
+          expect(fit.under <= 1, `${where}：${fit.id} 的字钻到页头底下 ${fit.under} 像素`);
+          expect(fit.over <= 1, `${where}：${fit.id} 的字超出了它的位置 ${fit.over} 像素（压到清单上或者被裁掉）`);
+          if (fraction === 0.56) await shot(`${size.width}x${size.height}`);
+          if (size.set && fraction === 0.56) {
+            await page.waitForSelector('[data-lock][data-lock-scene]', { timeout: 6000 }).catch(() => {});
+            const set = await page.evaluate(() => document.querySelector('[data-lock-canvas]').dataset.filmSet ?? null);
+            if (set !== null) expect(set === size.set, `${where}：这是手机，应当用竖版，用的却是 ${set}`);
+          }
+        }
+      }
+    },
+  },
+  {
+    // 没滚到过闸之前只下头一遍稀的画面（十几帧），不把二十多 MB 的整段影片都下了；滚进去以后再补齐。
+    name: 'film-lazy',
+    engines: ['chromium'],
+    viewports: ['1440'],
+    async run({ page, url }) {
+      let frames = 0;
+      page.on('request', (request) => {
+        if (request.url().includes('/assets/film/') && request.url().endsWith('.webp')) frames++;
+      });
+      await page.goto(url, { waitUntil: 'load' });
+      const hasFilm = await page.evaluate(() => Boolean(document.querySelector('[data-lock-canvas]').dataset.film));
+      if (!hasFilm) return;
+      await page.waitForTimeout(7000);
+      expect(frames >= 1 && frames <= 20, `停在首屏七秒，下了 ${frames} 帧影片（应当只下头一遍稀的，十几帧）`);
+      await scrollLockTo(page, 0.3);
+      await page.waitForTimeout(6000);
+      expect(frames > 150, `滚进过闸六秒以后只下了 ${frames} 帧，其余的没有补上`);
     },
   },
   {
@@ -631,6 +767,8 @@ export const CHECKS = [
             inView: rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth,
             covered: !(top && (el === top || el.contains(top) || top.contains(el))),
             ring: style.outlineStyle !== 'none' || style.boxShadow !== 'none',
+            // 页头里的东西：焦点框的颜色和页头的字色是不是同一个。
+            header: el.closest('.site-header') ? { ring: style.outlineColor, ink: getComputedStyle(el.closest('.site-header')).color } : null,
           };
         });
         if (!stop) break;
@@ -644,6 +782,8 @@ export const CHECKS = [
       expect(lost.length === 0, `聚焦以后不在视口里：${lost.join('；')}`);
       expect(covered.length === 0, `聚焦以后被别的东西盖住了：${covered.join('；')}`);
       expect(bare.length === 0, `聚焦以后看不见焦点：${bare.join('；')}`);
+      const pale = stops.filter((stop) => stop.header && stop.header.ring !== stop.header.ink).map((stop) => `${stop.what}（焦点框 ${stop.header.ring}，字 ${stop.header.ink}）`);
+      expect(pale.length === 0, `页头里的焦点框没有跟着页头的字色走：${pale.join('；')}`);
     },
   },
   {

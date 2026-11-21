@@ -11,7 +11,7 @@ node build.js          # 生成到 dist/
 node tools/serve.js    # 在本机起一个静态服务，打开它打印的地址
 ```
 
-要 Node 20 或更新。没有 npm 依赖，不用 `npm install`。
+要 Node 22 或更新。没有 npm 依赖，不用 `npm install`。
 
 ## 这里面有什么
 

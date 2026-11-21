@@ -8,6 +8,7 @@ import * as contract from './sections/contract.js';
 import * as roster from './sections/roster.js';
 import * as limits from './sections/limits.js';
 import * as install from './sections/install.js';
+import { STAGE_QUERY } from './scripts/stage.js';
 import * as footer from './sections/footer.js';
 
 // ctx = { lang, t, base, config, version, film }
@@ -38,8 +39,8 @@ ${config.langs.map((l) => html`<link rel="alternate" hreflang="${l.htmlLang}" hr
 <meta name="poundlock-site-version" content="${version}">
 <link rel="icon" type="image/svg+xml" href="${base}assets/logo/poundlock-tile.svg">
 <link rel="stylesheet" href="${base}assets/site.css">
-<script>document.documentElement.classList.add('js',matchMedia('(prefers-reduced-motion: reduce)').matches?'motion-reduced':'motion-ok')</script>
-<script type="module" src="${base}assets/scripts/main.js"></script>
+<script>(function(d,m){var r=m('(prefers-reduced-motion: reduce)').matches;d.classList.add('js',r?'motion-reduced':'motion-ok');if(!r&&m('${STAGE_QUERY}').matches)d.classList.add('stage-ok')})(document.documentElement,matchMedia)</script>
+<script type="module" src="${base}assets/scripts/main.js" onerror="document.documentElement.classList.remove('stage-ok');document.documentElement.classList.add('script-failed')"></script>
 </head>`;
 }
 

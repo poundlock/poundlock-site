@@ -25,6 +25,12 @@ export function loadOrder(count) {
   return order;
 }
 
+// loadOrder 的头一遍（每隔十六帧一帧，加上最后一帧）有几帧。
+// 访客还没滚进过闸时只下这一遍：够拖着看个大概，一共一两 MB；滚进来了再补齐其余的。
+export function coarseCount(count) {
+  return Math.ceil(count / 16) + ((count - 1) % 16 === 0 ? 0 : 1);
+}
+
 // 要画第 index 帧，它还没到：用已经到了的里面最近的一帧。一帧都没到返回 -1。
 export function nearestLoaded(index, has, count) {
   for (let d = 0; d < count; d++) {
@@ -60,7 +66,8 @@ const PARALLEL = 6; // 同时下载几帧
 export const DAY_AT = 0.955;
 
 // film = { base, sets: { wide: { dir, ext, count, width, height }, tall: {…} } }
-// 返回 { kind: 'film', frame(progress, now, snap), destroy() }；画不了返回 null。
+// 返回 { kind: 'film', frame(progress, now, snap), fill(), destroy() }；画不了返回 null。
+// 挂上以后先只下头一遍稀的画面；fill() 是「访客滚进来了，把其余的补齐」。
 // onFail：画面一帧都下不来的时候调一次（调用方换成平面的那张图）。
 export function mountFilm(root, canvas, film, { onFail } = {}) {
   const doc = root.ownerDocument;
@@ -73,6 +80,8 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
   let images = [];
   let loaded = new Set();
   let queue = [];
+  let rest = [];
+  let filled = false;
   let active = 0;
   let generation = 0;
   let failures = 0;
@@ -140,14 +149,18 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
       return Number.isFinite(value) ? value : fallback;
     };
     anchor = { x: read('--film-x', 0.5), y: read('--film-y', 0.5) };
-    const next = pickSet(film.sets, canvas.clientWidth, canvas.clientHeight);
+    // 看的是视口，不是画布：手机上画布只占上面一截，比视口扁得多，拿它判断会把手机当成横屏。
+    const next = pickSet(film.sets, win.innerWidth, win.innerHeight);
     if (next !== name) {
       name = next;
       set = film.sets[name];
       generation++;
       images = new Array(set.count);
       loaded = new Set();
-      queue = loadOrder(set.count);
+      const order = loadOrder(set.count);
+      const coarse = filled ? order.length : coarseCount(set.count);
+      queue = order.slice(0, coarse);
+      rest = order.slice(coarse);
       active = 0;
       drawn = -1;
       canvas.dataset.filmSet = name;
@@ -190,10 +203,18 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
       root.toggleAttribute('data-day', day);
       doc.documentElement.style.setProperty('--header-day', day ? '1' : '0');
     },
+    fill() {
+      if (dead || filled) return;
+      filled = true;
+      queue = queue.concat(rest);
+      rest = [];
+      pump();
+    },
     destroy() {
       dead = true;
       generation++;
       queue = [];
+      rest = [];
       win.removeEventListener('resize', onResize);
       doc.documentElement.style.removeProperty('--header-day');
       root.removeAttribute('data-day');

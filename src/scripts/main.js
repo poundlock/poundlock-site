@@ -10,6 +10,8 @@ let reduced = prefersReducedMotion(window);
 function setMotionClass() {
   root.classList.toggle('motion-reduced', reduced);
   root.classList.toggle('motion-ok', !reduced);
+  // 整页退回静态时，过闸那个粘住的舞台也收掉（它的样式挂在 stage-ok 上）。
+  if (reduced) root.classList.remove('stage-ok');
 }
 setMotionClass();
 
@@ -43,6 +45,8 @@ async function start(path, init, selector, anime) {
     await module[init](element, anime, { reduced });
   } catch (error) {
     console.warn(`[poundlock] ${path} 没起来，这一块保持静态。`, error);
+    // 过闸没起来：收掉粘住的舞台，退回静态的清单——不然八段里有七段藏着，谁也读不到。
+    if (selector === '[data-lock]') root.classList.remove('stage-ok');
   }
 }
 
@@ -61,8 +65,12 @@ for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) {
 // 带着锚点打开页面时，浏览器在各模块接管之前就滚到了那一节；接管以后有的节高度变了
 // （闯闸那块面板从一张清单变成左右两栏），有的浏览器（Safari）不会跟着调滚动位置，落点就偏了。
 // 所以接管完补一次定位。访客自己已经动过页面就不补，不跟他抢。
+// 只在「新打开」时补：刷新、后退回来的时候，浏览器恢复的是访客离开前的位置，不是锚点，补了反而把人拉走。
+const navigation = performance.getEntriesByType('navigation')[0];
+const freshVisit = !navigation || navigation.type === 'navigate';
+
 function reanchor() {
-  if (touched || location.hash.length < 2) return;
+  if (!freshVisit || touched || location.hash.length < 2) return;
   let target = null;
   try {
     target = document.getElementById(decodeURIComponent(location.hash.slice(1)));

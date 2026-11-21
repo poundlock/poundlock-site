@@ -1,6 +1,6 @@
 /* 过闸。
    默认（没有脚本、减少动效）：一张升满了的图，下面是八个阶段的清单，全在深色底上。
-   .js.motion-ok：画面停在视口里，滚动推进八拍；最后整片水往下退，同一张图在水面以上换成浅色。 */
+   .js.stage-ok（脚本在、没要求减少动效、视口放得下）：画面停在视口里，滚动推进八拍；最后整片水往下退，同一张图在水面以上换成浅色。 */
 
 .lock {
   background: var(--bg);
@@ -201,11 +201,11 @@
 
 /* ---------- 动效在的时候 ---------- */
 
-.js.motion-ok .lock__track {
+.js.stage-ok .lock__track {
   height: 500svh;
 }
 
-.js.motion-ok .lock__stage {
+.js.stage-ok .lock__stage {
   position: sticky;
   top: 0;
   height: 100svh;
@@ -217,7 +217,7 @@
 }
 
 /* 水下和水面以上两层，版式一模一样，图才能在水退下去的时候原地换色。 */
-.js.motion-ok .lock__layer {
+.js.stage-ok .lock__layer {
   position: absolute;
   inset: 0;
   display: grid;
@@ -232,13 +232,13 @@
   color: var(--fg);
 }
 
-.js.motion-ok .lock__air {
+.js.stage-ok .lock__air {
   background: var(--bg);
 }
 
 /* 水从上往下退：水这一层不挪位置，只是从上往下被裁掉，底下那张浅色的图就在原地露出来。
    --surface 由 lock.js 写在 .lock__stage 上，0 是水满着，1 是退完了。 */
-.js.motion-ok .lock__water {
+.js.stage-ok .lock__water {
   /* 最上面一行和上一节的底色一样，画面滚进来的时候不留一道边；亮的那一带在偏上的位置。 */
   background: linear-gradient(180deg, var(--bg) 0%, var(--stage-glow) 26%, var(--bg) 72%);
   clip-path: inset(calc(var(--surface, 0) * (100% + 48px)) 0 0 0);
@@ -246,7 +246,7 @@
 }
 
 /* 水面：一道波压在水的上沿。平时在视口上面看不见。 */
-.js.motion-ok .lock__wave {
+.js.stage-ok .lock__wave {
   display: block;
   position: absolute;
   left: 0;
@@ -272,7 +272,7 @@
   opacity: 0.8;
 }
 
-.js.motion-ok .lock__scene {
+.js.stage-ok .lock__scene {
   grid-area: scene;
   align-self: center;
   justify-self: end;
@@ -281,32 +281,32 @@
   margin: 0;
 }
 
-.js.motion-ok .lock__svg {
+.js.stage-ok .lock__svg {
   display: block;
   max-height: calc(100svh - 64px - 210px);
   margin-left: auto;
 }
 
 /* 还没放水的闸室是空的；水位、船、闸门由时间线接管。脚本没接管之前（动效库还在路上）先按开场的样子摆。 */
-.js.motion-ok .lock__svg--deep .slab__water {
+.js.stage-ok .lock__svg--deep .slab__water {
   transform: translateY(var(--empty));
 }
 
-.js.motion-ok .lock__svg--deep .gate,
-.js.motion-ok .lock__svg--deep .slab__lane {
+.js.stage-ok .lock__svg--deep .gate,
+.js.stage-ok .lock__svg--deep .slab__lane {
   opacity: 0;
 }
 
-.js.motion-ok .lock__svg--deep .boat {
+.js.stage-ok .lock__svg--deep .boat {
   transform: translate(var(--boat-start-x), var(--river));
 }
 
-.js.motion-ok .lock__svg--deep .gauge__float {
+.js.stage-ok .lock__svg--deep .gauge__float {
   transform: translateY(var(--river));
 }
 
 /* 八个阶段的说明叠在同一个位置，一次只露当前这一段。 */
-.js.motion-ok .lock__flight {
+.js.stage-ok .lock__flight {
   grid-area: text;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -314,42 +314,48 @@
   align-self: center;
 }
 
-.js.motion-ok .chamber {
+.js.stage-ok .chamber {
   grid-area: 1 / 1;
   opacity: 0;
-  visibility: hidden;
+  /* 只是看不见：不用 visibility 藏，读屏照样读得到全部八段。 */
+  pointer-events: none;
   transform: translateY(14px);
-  transition: opacity 260ms ease, transform 420ms var(--ease-water), visibility 0s linear 260ms;
+  transition: opacity 260ms ease, transform 420ms var(--ease-water);
 }
 
-.js.motion-ok .chamber[data-current],
-.js.motion-ok .lock:not([data-lock-live]) .lock__water .chamber:first-child {
+.js.stage-ok .chamber[data-current],
+.js.stage-ok .lock:not([data-lock-live]) .lock__water .chamber:first-child {
   opacity: 1;
-  visibility: visible;
+  pointer-events: auto;
   transform: none;
-  transition-delay: 0s, 0s, 0s;
 }
 
-.js.motion-ok .chamber__id {
+.js.stage-ok .chamber__id {
   font-size: var(--text-6);
 }
 
-.js.motion-ok .chamber__name {
+.js.stage-ok .chamber__name {
   font-size: clamp(var(--text-6), 3.6vw, var(--text-7));
 }
 
-.js.motion-ok .chamber__line {
+.js.stage-ok .chamber__line {
   margin-top: var(--space-3);
   font-size: var(--text-4);
   line-height: 1.6;
 }
 
-.js.motion-ok .chamber__artifacts {
-  display: none;
+/* 每一段的产物在底下的清单里演；这里的这一份看不见，留给读屏。 */
+.js.stage-ok .chamber__artifacts {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* 账本：每过一段，这一段的产物落进来。 */
-.js.motion-ok .lock__ledger {
+.js.stage-ok .lock__ledger {
   grid-area: ledger;
   display: block;
   min-height: 84px;
@@ -391,7 +397,7 @@
 }
 
 @media (max-width: 767px) {
-  .js.motion-ok .lock__layer {
+  .js.stage-ok .lock__layer {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
     grid-template-areas:
@@ -404,7 +410,7 @@
     padding-bottom: var(--space-3);
   }
 
-  .js.motion-ok .lock__svg {
+  .js.stage-ok .lock__svg {
     max-height: 34svh;
     margin-inline: auto;
   }
@@ -414,33 +420,33 @@
     display: none;
   }
 
-  .js.motion-ok .lock__flight {
+  .js.stage-ok .lock__flight {
     align-self: start;
   }
 
-  .js.motion-ok .chamber__id {
+  .js.stage-ok .chamber__id {
     font-size: var(--text-5);
   }
 
-  .js.motion-ok .chamber__name {
+  .js.stage-ok .chamber__name {
     font-size: var(--text-6);
   }
 
-  .js.motion-ok .chamber__line {
+  .js.stage-ok .chamber__line {
     margin-top: var(--space-2);
     font-size: var(--text-3);
   }
 
-  .js.motion-ok .chamber__words {
+  .js.stage-ok .chamber__words {
     display: none;
   }
 
-  .js.motion-ok .lock__ledger {
+  .js.stage-ok .lock__ledger {
     min-height: 0;
     padding-top: var(--space-2);
   }
 
-  .js.motion-ok .lock__ledger-title {
+  .js.stage-ok .lock__ledger-title {
     display: none;
   }
 
@@ -455,7 +461,7 @@
   display: none;
 }
 
-.js.motion-ok .lock[data-lock-film] .lock__canvas {
+.js.stage-ok .lock[data-lock-film] .lock__canvas {
   display: block;
   position: absolute;
   inset: 0;
@@ -469,28 +475,28 @@
   transition: opacity 600ms ease;
 }
 
-.js.motion-ok .lock[data-lock-film][data-lock-film-ready] .lock__canvas {
+.js.stage-ok .lock[data-lock-film][data-lock-film-ready] .lock__canvas {
   opacity: 1;
 }
 
 /* 平面那张图用的东西都收起来：水面以上那一层、那道波、图本身。图的位置留着，影片从那里透出来。 */
-.js.motion-ok .lock[data-lock-film] .lock__air,
-.js.motion-ok .lock[data-lock-film] .lock__wave {
+.js.stage-ok .lock[data-lock-film] .lock__air,
+.js.stage-ok .lock[data-lock-film] .lock__wave {
   display: none;
 }
 
-.js.motion-ok .lock[data-lock-film] .lock__scene {
+.js.stage-ok .lock[data-lock-film] .lock__scene {
   visibility: hidden;
 }
 
-.js.motion-ok .lock[data-lock-film] .lock__stage {
+.js.stage-ok .lock[data-lock-film] .lock__stage {
   background: var(--bg);
 }
 
 /* 字压在画面上：左边和底下各垫一层往画面里淡出去的暗色，字才读得清。
    画面两侧一直是暗的（夜里是岸，天亮了是逆光的树林），所以字从头到尾用浅色，不跟着天亮换。
    快到头的时候字淡出去，让位给下面那层升上来的亮色。 */
-.js.motion-ok .lock[data-lock-film] .lock__water {
+.js.stage-ok .lock[data-lock-film] .lock__water {
   clip-path: none;
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--shade) 84%, transparent) 0%, color-mix(in srgb, var(--shade) 58%, transparent) 30%, transparent 58%),
@@ -499,7 +505,7 @@
 }
 
 /* 收尾：一层和下一节同色的亮从底下漫上来，画面滚走的时候不是一刀切。 */
-.js.motion-ok .lock[data-lock-film] .lock__stage::after {
+.js.stage-ok .lock[data-lock-film] .lock__stage::after {
   content: "";
   position: absolute;
   inset: auto 0 0 0;
@@ -511,23 +517,92 @@
 
 @media (max-width: 767px) {
   /* 窄屏上画面在上、字在下：画布只占上面一截，底下往暗色里淡出去。 */
-  .js.motion-ok .lock[data-lock-film] .lock__canvas {
+  .js.stage-ok .lock[data-lock-film] .lock__canvas {
     inset: 0 0 auto 0;
     height: 60svh;
     --film-x: 0.5;
     --film-y: 0.4;
   }
 
-  .js.motion-ok .lock[data-lock-film] .lock__water {
+  .js.stage-ok .lock[data-lock-film] .lock__water {
     background: linear-gradient(0deg, var(--bg) 0%, var(--bg) 40%, color-mix(in srgb, var(--bg) 72%, transparent) 48%, transparent 62%);
   }
 
-  .js.motion-ok .lock[data-lock-film] .lock__scene {
+  .js.stage-ok .lock[data-lock-film] .lock__scene {
     height: 40svh;
   }
 
-  /* 一路攒下来的产物有十几件，手机上放不下：只显示这一段刚落下的。 */
-  .js.motion-ok .lock[data-lock-film] .lock__tag:not([data-now]) {
+  /* 一路攒下来的产物有十几件，手机上放不下：只显示这一段刚落下的（影片版、平面版都一样）。 */
+  .js.stage-ok .lock__water .lock__tag:not([data-now]) {
     display: none;
+  }
+}
+
+/* ---------- 矮的视口 ----------
+   再矮就不开舞台了（stage.js 的 STAGE_QUERY），这里是「还开着、但得省着用」的那一档：
+   画面矮一点，字小一号，收起补充的那一行，产物清单只留一行或者不显示。 */
+
+@media (max-width: 767px) and (max-height: 719px) {
+  .js.stage-ok .lock[data-lock-film] .lock__canvas {
+    height: 50svh;
+  }
+
+  .js.stage-ok .lock[data-lock-film] .lock__scene {
+    height: 30svh;
+  }
+
+  .js.stage-ok .lock__svg {
+    max-height: 26svh;
+  }
+
+  .js.stage-ok .lock[data-lock-film] .lock__water {
+    background: linear-gradient(0deg, var(--bg) 0%, var(--bg) 50%, color-mix(in srgb, var(--bg) 72%, transparent) 58%, transparent 72%);
+  }
+
+  .js.stage-ok .chamber__name {
+    font-size: var(--text-5);
+  }
+
+  .js.stage-ok .chamber__id {
+    font-size: var(--text-4);
+  }
+
+  .js.stage-ok .chamber__line {
+    font-size: var(--text-2);
+    line-height: 1.5;
+  }
+
+  .js.stage-ok .chamber__note {
+    display: none;
+  }
+
+  .js.stage-ok .chamber__roles {
+    gap: 6px;
+    margin-top: var(--space-2);
+  }
+
+  .js.stage-ok .chamber .chip {
+    padding: 0.12em 0.7em;
+    font-size: var(--text-1);
+  }
+
+  .js.stage-ok .lock__ledger-list {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 768px) and (max-height: 639px) {
+  .js.stage-ok .lock__ledger,
+  .js.stage-ok .chamber__note {
+    display: none;
+  }
+
+  .js.stage-ok .chamber__name {
+    font-size: var(--text-6);
+  }
+
+  .js.stage-ok .chamber__line {
+    font-size: var(--text-3);
   }
 }

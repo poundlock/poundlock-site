@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { coverRect, frameAt, loadOrder, nearestLoaded, pickSet } from '../src/scripts/lock-film.js';
+import { coarseCount, coverRect, frameAt, loadOrder, nearestLoaded, pickSet } from '../src/scripts/lock-film.js';
 
 test('frameAt：进度 0 是第一帧，1 是最后一帧，出界的夹住', () => {
   assert.equal(frameAt(0, 240), 0);
@@ -74,4 +74,17 @@ test('pickSet：横屏用横版，手机竖屏用竖版，够宽的竖屏还是�
   assert.equal(pickSet(sets, 600, 900), 'tall');
   assert.equal(pickSet({ wide: sets.wide }, 390, 844), 'wide');
   assert.equal(pickSet({}, 390, 844), null);
+});
+
+test('coarseCount：头一遍稀的有几帧——每隔十六帧一帧，加上最后一帧', () => {
+  assert.equal(coarseCount(240), 16);
+  assert.equal(coarseCount(120), 9);
+  assert.equal(coarseCount(1), 1);
+  assert.equal(coarseCount(10), 2);
+  // 就是 loadOrder 的头这么多个：全是十六的倍数，或者最后一帧。
+  for (const count of [240, 120, 33]) {
+    const head = loadOrder(count).slice(0, coarseCount(count));
+    assert.ok(head.every((i) => i % 16 === 0 || i === count - 1), `${count} 帧时头一遍里混进了别的帧：${head}`);
+    assert.ok(head.includes(0) && head.includes(count - 1));
+  }
 });

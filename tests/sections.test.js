@@ -108,3 +108,18 @@ test('六节的样式都拼进了 site.css', () => {
     assert.ok(css.includes(selector), `site.css 里没有 ${selector}`);
   }
 });
+
+test('过闸的舞台只在放得下的视口里开：页头的内联脚本照 STAGE_QUERY 标 stage-ok，样式都挂在它上面', async () => {
+  const { STAGE_QUERY } = await import('../src/scripts/stage.js');
+  for (const code of ['zh', 'en']) {
+    const head = pages[code].text.slice(0, pages[code].text.indexOf('</head>'));
+    assert.ok(head.includes(STAGE_QUERY), `${code}：页头的内联脚本里没有 STAGE_QUERY`);
+    assert.ok(head.includes("'stage-ok'"), `${code}：页头的内联脚本没有标 stage-ok`);
+    // 入口脚本取不到时：撤掉 stage-ok，过闸退回静态的清单。
+    const entry = /<script type="module"[^>]*>/.exec(head);
+    assert.ok(entry && /onerror="[^"]*stage-ok[^"]*"/.test(entry[0]), `${code}：入口脚本上没有取不到时的退路`);
+  }
+  const css = readFileSync(path.join(ROOT, 'src', 'styles', 'sections', 'lock.css'), 'utf8');
+  assert.ok(!css.includes('.js.motion-ok'), 'lock.css 里还有直接挂在 motion-ok 上的规则：粘住的舞台要挂在 stage-ok 上');
+  assert.ok(css.includes('.js.stage-ok .lock__stage'));
+});

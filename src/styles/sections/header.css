@@ -3,10 +3,12 @@
 .site-header {
   /* 不做渐变：过闸快结束、水面退到页头后面的那一刻（--rise 到 0.94）一下子从深换到浅。
      慢慢混的话，中间有一段字和底都是灰的，看不清。 */
-  /* 三维的过闸会直接告诉页头天亮了没有（--header-day，0 或 1）；平面的那一版没有它，就按进度算。 */
+  /* 影片版的过闸会直接告诉页头天亮了没有（--header-day，0 或 1）；平面的那一版没有它，就按进度算。 */
   --header-flip: var(--header-day, clamp(0, (var(--rise) - 0.94) * 1000, 1));
   --header-ink: color-mix(in srgb, var(--zd-fg), var(--zl-fg) calc(var(--header-flip) * 100%));
   --header-ground: color-mix(in srgb, var(--zd-bg), var(--zl-bg) calc(var(--header-flip) * 100%));
+  /* 页头在 <main> 外面，不属于哪一段：焦点框用它自己的字色。不然换成浅色以后，框还是深色段的亮青色，几乎看不见。 */
+  --accent: var(--header-ink);
   /* 图标的三片：深色段上用水的深色版那三档，换到浅色段时一起换成浅色版。 */
   --mark-lo-0: color-mix(in srgb, var(--water-lo-0), var(--blue-lo-0) calc(var(--header-flip) * 100%));
   --mark-lo-1: color-mix(in srgb, var(--mint-lo), var(--blue-lo) calc(var(--header-flip) * 100%));
@@ -43,6 +45,11 @@
 }
 
 .site-header[data-scrolled="true"]::before {
+  opacity: 0.94;
+}
+
+/* 入口脚本没取到：没有人告诉页头滚没滚过页顶，那就一直垫着底色——不然它的浅字会压在浅色段上。 */
+.script-failed .site-header::before {
   opacity: 0.94;
 }
 

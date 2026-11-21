@@ -6,6 +6,7 @@
 
 import { lockStateAt } from './lock-state.js';
 import { mountFilm } from './lock-film.js';
+import { STAGE_QUERY } from './stage.js';
 
 export function beatAt(progress, beats = 8) {
   const p = Math.min(1, Math.max(0, progress));
@@ -118,21 +119,49 @@ function mountFlat(root, anime) {
     },
     destroy() {
       if (timeline.revert) timeline.revert();
+      for (const element of [...slabs.map((slab) => slab.water), ...Object.values(gateOf), ...lanes, boat, float]) element.removeAttribute('style');
+      stage.style.removeProperty('--surface');
     },
   };
 }
 
+// 粘住的舞台只在放得下的视口里开（STAGE_QUERY，见 stage.js）。视口变了（转屏、改窗口大小、放大）就跟着开或者收：
+// 收起来的时候这一节是静态的清单，八段都读得到。
 export function initLock(root, anime, { reduced = false } = {}) {
   const none = { destroy() {} };
-  if (reduced) return none;
+  if (reduced || !root.querySelector('[data-lock-track]')) return none;
 
+  const doc = root.ownerDocument;
+  const win = doc.defaultView;
+  const query = win.matchMedia(STAGE_QUERY);
+  let stage = null;
+  const sync = () => {
+    doc.documentElement.classList.toggle('stage-ok', query.matches);
+    if (query.matches && !stage) stage = openStage(root, anime);
+    else if (!query.matches && stage) {
+      stage.destroy();
+      stage = null;
+    }
+  };
+  query.addEventListener('change', sync);
+  sync();
+
+  return {
+    destroy() {
+      query.removeEventListener('change', sync);
+      if (stage) stage.destroy();
+      stage = null;
+    },
+  };
+}
+
+function openStage(root, anime) {
   const doc = root.ownerDocument;
   const win = doc.defaultView;
   const track = root.querySelector('[data-lock-track]');
   const canvas = root.querySelector('[data-lock-canvas]');
   const chambers = [...root.querySelectorAll('[data-stage]')];
   const tags = [...root.querySelectorAll('[data-ledger-beat]')];
-  if (!track) return none;
 
   // 这一拍、这一段的文字、账本里已经落下的产物：直接跟着滚动位置走。
   let progress = 0;
@@ -154,10 +183,14 @@ export function initLock(root, anime, { reduced = false } = {}) {
     });
   };
 
-  // 画面（影片，或者平面的那张图）等快滚到这一节了才去加载：影片有一两百张图，不跟首屏抢带宽和帧。
   let scene = null;
+  let inView = false;
   const film = readFilm(canvas);
   const saveData = Boolean(win.navigator.connection && win.navigator.connection.saveData);
+  const useFilm = Boolean(film) && !saveData;
+  // 有影片就一开始把这一节标成影片版：平面的那张图从头收着，不会在影片到之前先闪出来
+  // （在过闸中间刷新时，它闪出来的是停在开场的样子，和文字对不上）。
+  if (useFilm) root.setAttribute('data-lock-film', '');
 
   const show = (mounted) => {
     scene = mounted;
@@ -168,6 +201,7 @@ export function initLock(root, anime, { reduced = false } = {}) {
     root.dataset.lockScene = scene.kind;
     apply();
     scene.frame(progress, win.performance.now(), true);
+    if (inView && scene.fill) scene.fill();
   };
 
   // 影片一帧都下不来：收起画布，换成平面的那张图。
@@ -180,9 +214,7 @@ export function initLock(root, anime, { reduced = false } = {}) {
   const mount = () => {
     if (scene) return;
     let mounted = null;
-    if (film && !saveData) {
-      // 先标上，画布才显示出来、量得到大小。
-      root.setAttribute('data-lock-film', '');
+    if (useFilm) {
       mounted = mountFilm(root, canvas, film, { onFail: toFlat });
       if (!mounted) root.removeAttribute('data-lock-film');
     }
@@ -193,7 +225,6 @@ export function initLock(root, anime, { reduced = false } = {}) {
   // 这一节在视口里的时候每帧做两件事：读一次滚动位置（不单靠 scroll 事件——有的浏览器在惯性滚动、
   // 或者脚本滚动之后，事件来得晚），再画一帧。不在视口里就停。
   let frame = 0;
-  let inView = false;
   const loop = (now) => {
     apply();
     if (scene) scene.frame(progress, now);
@@ -202,18 +233,26 @@ export function initLock(root, anime, { reduced = false } = {}) {
   const observer = new win.IntersectionObserver((entries) => {
     inView = entries[entries.length - 1].isIntersecting;
     apply();
-    if (inView && !frame) frame = win.requestAnimationFrame(loop);
+    if (inView) {
+      // 访客真的滚进来了：影片其余的帧这时候才开始下。
+      if (scene && scene.fill) scene.fill();
+      if (!frame) frame = win.requestAnimationFrame(loop);
+    }
     // 滚出视口的那一刻画面直接到位：不然滚得快时惯性还没追上循环就停了，页头的颜色会停在半路。
     if (!inView && scene) scene.frame(progress, win.performance.now(), true);
   });
   observer.observe(track);
 
-  // 离这一节还有一屏的时候开始加载画面。
+  // 离这一节还有一屏的时候挂上画面（影片先只下头一遍稀的，一两 MB）。
+  let timer = 0;
   const nearby = new win.IntersectionObserver(
     (entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
-      // 这一节紧挨着首屏：页面刚打开时它就算「快到了」。等首屏那段入场动画放完再加载，别抢它的帧。
-      win.setTimeout(mount, Math.max(0, 3500 - win.performance.now()));
+      nearby.disconnect();
+      // 这一节紧挨着首屏：页面刚打开时它就算「快到了」。访客还在首屏，就等首屏那段入场动画放完再挂，别抢它的帧；
+      // 已经滚下来了（在过闸中间刷新、带着锚点进来），马上挂。
+      const atTop = win.scrollY < win.innerHeight * 0.5;
+      timer = win.setTimeout(mount, atTop ? Math.max(0, 3500 - win.performance.now()) : 0);
     },
     { rootMargin: '100% 0px 100% 0px' },
   );
@@ -227,16 +266,27 @@ export function initLock(root, anime, { reduced = false } = {}) {
   root.dataset.lockLive = 'true';
 
   return {
+    // 收干净：这一节要退回静态的清单（转屏以后放不下了），不能留着舞台的状态。
     destroy() {
       win.removeEventListener('scroll', onChange);
       win.removeEventListener('resize', onChange);
       observer.disconnect();
       nearby.disconnect();
+      win.clearTimeout(timer);
       if (frame) win.cancelAnimationFrame(frame);
       if (scene) scene.destroy();
+      scene = null;
       delete root.dataset.lockLive;
       delete root.dataset.lockScene;
+      delete root.dataset.beat;
       root.removeAttribute('data-lock-film');
+      root.style.removeProperty('--lock-progress');
+      doc.documentElement.style.removeProperty('--rise');
+      chambers.forEach((chamber) => chamber.removeAttribute('data-current'));
+      tags.forEach((tag) => {
+        tag.removeAttribute('data-in');
+        tag.removeAttribute('data-now');
+      });
     },
   };
 }
