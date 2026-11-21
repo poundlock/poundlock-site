@@ -190,13 +190,17 @@ button {
   line-height: 1.25;
   text-decoration: none;
   cursor: pointer;
-  transition: transform var(--time-gate) var(--ease-gate), box-shadow var(--time-gate) ease;
+  transition: box-shadow 160ms ease-out, background-color 160ms ease-out, transform 120ms ease-out;
 }
 
 .btn--primary {
   color: var(--btn-fg);
   background: linear-gradient(180deg, var(--btn-0), var(--btn-1));
-  box-shadow: 0 1px 0 color-mix(in srgb, #fff 40%, transparent) inset, 0 10px 26px -13px color-mix(in srgb, var(--btn-glow) 60%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, #fff 40%, transparent) inset;
+}
+
+.btn--primary:hover {
+  box-shadow: 0 1px 0 color-mix(in srgb, #fff 40%, transparent) inset, 0 0 0 4px color-mix(in srgb, var(--btn-1) 30%, transparent);
 }
 
 .btn--ghost {
@@ -205,18 +209,18 @@ button {
   box-shadow: 0 0 0 1.5px var(--line) inset;
 }
 
+.btn--ghost:hover {
+  background-color: color-mix(in srgb, var(--fg) 9%, transparent);
+}
+
 .btn--small {
   min-height: 40px;
   padding: 0.45em 1.1em;
   font-size: var(--text-2);
 }
 
-.btn:hover {
-  transform: translateY(-2px);
-}
-
 .btn:active {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 /* 星标数：和按钮文字之间隔一道闸缝。 */

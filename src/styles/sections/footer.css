@@ -6,9 +6,7 @@
   gap: var(--space-5);
   padding-top: var(--space-8);
   padding-bottom: var(--space-6);
-  background:
-    radial-gradient(70% 90% at 14% 0%, color-mix(in srgb, var(--scene-0) 60%, transparent), transparent 66%),
-    linear-gradient(180deg, var(--scene-1), var(--shade));
+  background: linear-gradient(168deg, color-mix(in srgb, var(--scene-0) 42%, var(--scene-1)) 0%, var(--scene-1) 44%, var(--shade) 100%);
 }
 
 .end__closing {

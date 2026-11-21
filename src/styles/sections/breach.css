@@ -9,9 +9,7 @@
   padding: clamp(var(--space-4), 4vw, var(--space-6));
   border-radius: var(--radius-m);
   color: var(--fg);
-  background:
-    radial-gradient(90% 70% at 12% 0%, color-mix(in srgb, var(--tint) 16%, transparent), transparent 60%),
-    linear-gradient(150deg, var(--zd-raise), var(--bg) 62%);
+  background: linear-gradient(150deg, var(--zd-raise), var(--bg) 62%);
   box-shadow: 0 30px 60px -36px color-mix(in srgb, var(--shade) 70%, transparent);
   /* clip 而不是 hidden：hidden 会让里面的 sticky 失效（手机上那张图要粘在顶上）。 */
   overflow: clip;

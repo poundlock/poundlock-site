@@ -8,7 +8,7 @@
     "skip": "Skip to content"
   },
   "hero": {
-    "h1": "Ten roles finish your requirement, in order.",
+    "h1": "Ten roles finish your requirement, in order",
     "sub": "poundlock is a Claude Code plugin. You talk to one project manager; whether each step is really done is checked by gates, not claimed by the AI.",
     "ctaStar": "Star on GitHub",
     "ctaDemo": "Watch a run",
@@ -114,7 +114,7 @@
     }
   },
   "breach": {
-    "title": "Want to cut a corner? Try it.",
+    "title": "Want to cut a corner? Try it",
     "lead": "Here are six common shortcuts. Pick one and watch the gate close.",
     "demoBadge": "Demo: a replay of the plugin’s real behavior, not a live run. The real messages are in Chinese.",
     "allTried": "All six gates are code that blocks the call, not a line in a prompt asking the AI to behave.",
@@ -229,7 +229,7 @@
     "scopeWarning": "Do not drop --scope local from the install command: without it, every new session on this machine, in every project, starts as the project manager.",
     "copy": "Copy",
     "copied": "Copied",
-    "copyFallback": "Selected. Copy it by hand.",
+    "copyFallback": "Selected, copy it by hand",
     "firstRunTitle": "First run",
     "firstRunSteps": [
       "Once per project: it surveys the project and writes the project config.",
@@ -238,7 +238,7 @@
     "more": "Update, uninstall and the other commands are in the README"
   },
   "footer": {
-    "closing": "If this approach makes sense to you, give it a star.",
+    "closing": "If this approach makes sense to you, give it a star",
     "repo": "GitHub repository",
     "readme": "README",
     "changelog": "Changelog",

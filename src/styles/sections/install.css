@@ -6,9 +6,7 @@
   padding: clamp(var(--space-4), 3vw, var(--space-5));
   border-radius: var(--radius-m);
   color: var(--fg);
-  background:
-    radial-gradient(90% 80% at 10% 0%, color-mix(in srgb, var(--tint) 14%, transparent), transparent 60%),
-    linear-gradient(150deg, var(--zd-raise), var(--bg) 62%);
+  background: linear-gradient(150deg, var(--zd-raise), var(--bg) 62%);
   box-shadow: 0 30px 60px -36px color-mix(in srgb, var(--shade) 70%, transparent);
 }
 

@@ -50,7 +50,8 @@ test('键和 facts 对得上', () => {
 test('定下来的首屏文案', () => {
   assert.equal(zh.hero.h1, '十个角色，按顺序把你的需求做完');
   assert.equal(zh.hero.note, '');
-  assert.equal(en.hero.h1, 'Ten roles finish your requirement, in order.');
+  // 标题末尾不带句号（和中文那句一致）：通扫时去掉的，字没动。
+  assert.equal(en.hero.h1, 'Ten roles finish your requirement, in order');
   assert.equal(en.hero.note, 'The plugin itself runs in Chinese.');
 });
 
