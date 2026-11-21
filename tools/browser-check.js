@@ -56,6 +56,54 @@ function scrollLockTo(page, fraction) {
   }, fraction);
 }
 
+// 影片现在的样子：走的哪一路、哪一套、画的第几帧、要画第几帧、一共几帧。
+function filmState(page) {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-lock]');
+    const canvas = root.querySelector('[data-lock-canvas]');
+    const pixels = canvas.getContext('2d').getImageData(Math.floor(canvas.width * 0.45), Math.floor(canvas.height * 0.35), 32, 32).data;
+    let sum = 0;
+    for (let i = 0; i < pixels.length; i += 4) sum += pixels[i] + pixels[i + 1] + pixels[i + 2];
+    return {
+      scene: root.dataset.lockScene ?? null,
+      kind: canvas.dataset.filmKind ?? null,
+      set: canvas.dataset.filmSet ?? null,
+      frame: Number(canvas.dataset.frame),
+      want: Number(canvas.dataset.want),
+      count: Number(canvas.dataset.frames),
+      lit: sum / (32 * 32 * 3),
+      day: root.hasAttribute('data-day'),
+      phone: innerWidth < innerHeight && innerWidth <= 600,
+    };
+  });
+}
+
+// 等影片停稳：要画的那一帧不再变了，画出来的正是它（数据要下完、解出来，惯性要追上）。等不到就照现状返回，由调用方断言。
+async function settleFilm(page, { timeout = 25000 } = {}) {
+  let before = -1;
+  const until = Date.now() + timeout;
+  while (Date.now() < until) {
+    const now = await filmState(page);
+    if (Number.isFinite(now.want) && now.want === before && now.frame === now.want) return now;
+    before = now.want;
+    await page.waitForTimeout(200);
+  }
+  return filmState(page);
+}
+
+// 页面带没带视频那一路的画面（只压了图片、或者根本没有影片时没有）。
+function hasVideoFilm(page) {
+  return page.evaluate(() => {
+    const text = document.querySelector('[data-lock-canvas]')?.dataset.film;
+    if (!text) return false;
+    const film = JSON.parse(text);
+    return Boolean(film.tiers && Object.keys(film.tiers).length);
+  });
+}
+
+// 视频那一路要本机的 Chrome：Playwright 自带的 Chromium 没有 H.264 解码器，在它上面页面走的是图片那一路。
+const CHROME = { channel: 'chrome', args: GPU_ARGS };
+
 async function expectStagesVisible(page, t) {
   for (const stage of Object.values(t.lock.stages)) {
     const visible = await page.locator('[data-stage]').getByText(stage.name, { exact: true }).first().isVisible();
@@ -189,7 +237,8 @@ export const CHECKS = [
     },
   },
   {
-    // 影片版的过闸：画布上画着东西，滚到哪画哪一帧；横屏用横版、竖屏用竖版；平面那张图收起来；滚到头天亮。
+    // 影片版的过闸（视频那一路或者图片那一路，看这个内核走得了哪一路）：画布上画着东西，滚到哪画哪一帧；
+    // 手机用手机的那一套；平面那张图收起来；滚到头天亮。
     name: 'lock-film',
     viewports: ['1440', '820', '360'],
     async run({ page, url, shot, uncaught }) {
@@ -199,7 +248,6 @@ export const CHECKS = [
         page.evaluate(() => {
           const root = document.querySelector('[data-lock]');
           const canvas = root.querySelector('[data-lock-canvas]');
-          const set = JSON.parse(canvas.dataset.film).sets[canvas.dataset.filmSet];
           // 画布上取一小块算平均亮度：画上了东西就不是 0。
           const pixels = canvas.getContext('2d').getImageData(Math.floor(canvas.width * 0.45), Math.floor(canvas.height * 0.35), 32, 32).data;
           let sum = 0;
@@ -208,9 +256,11 @@ export const CHECKS = [
             film: root.hasAttribute('data-lock-film'),
             display: getComputedStyle(canvas).display,
             opacity: Number(getComputedStyle(canvas).opacity),
+            kind: canvas.dataset.filmKind,
             set: canvas.dataset.filmSet,
             frame: Number(canvas.dataset.frame),
-            count: set ? set.count : 0,
+            want: Number(canvas.dataset.want),
+            count: Number(canvas.dataset.frames),
             lit: sum / (32 * 32 * 3),
             flat: getComputedStyle(root.querySelector('.lock__water .lock__scene')).visibility,
             day: root.hasAttribute('data-day'),
@@ -223,29 +273,31 @@ export const CHECKS = [
             overlap: root.querySelector('.lock__water .chamber[data-current]').getBoundingClientRect().bottom - root.querySelector('.lock__water .lock__ledger').getBoundingClientRect().top,
           };
         });
-      // 等画面追到进度 fraction 对应的那一帧（这一带的帧要先下完，惯性要追上）。
-      const settle = (fraction) =>
-        page
-          .waitForFunction(
-            (f) => {
-              const canvas = document.querySelector('[data-lock-canvas]');
-              const set = JSON.parse(canvas.dataset.film).sets[canvas.dataset.filmSet];
-              return set && Math.abs(Number(canvas.dataset.frame) - Math.round(f * (set.count - 1))) <= 1;
-            },
-            fraction,
-            { timeout: 25000, polling: 200 },
-          )
-          .catch(() => {});
+      // 等画面追到要画的那一帧（这一带的帧要先下完、解出来，惯性要追上），而且要画的那一帧不再变了。
+      const settle = async () => {
+        let before = -1;
+        for (let i = 0; i < 100; i++) {
+          const now = await page.evaluate(() => {
+            const canvas = document.querySelector('[data-lock-canvas]');
+            return { frame: Number(canvas.dataset.frame), want: Number(canvas.dataset.want) };
+          });
+          if (Number.isFinite(now.want) && now.want === before && Math.abs(now.frame - now.want) <= 1) return;
+          before = now.want;
+          await page.waitForTimeout(250);
+        }
+      };
       await scrollLockTo(page, 0.3);
       // 画面是快滚到时才加载的：等它挂上、第一帧画出来。
-      await page.waitForSelector('[data-lock][data-lock-scene="film"][data-lock-film-ready]', { timeout: 25000 });
-      await settle(0.3);
+      await page.waitForSelector('[data-lock][data-lock-film-ready]:is([data-lock-scene="film"], [data-lock-scene="video"])', { timeout: 25000 });
+      await settle();
       await page.waitForTimeout(800);
       let s = await state();
       expect(s.film, '影片版的过闸没起来');
       expect(s.display === 'block' && s.opacity > 0.9, `画布没显示出来：${JSON.stringify(s)}`);
-      expect(s.set === (s.wide ? 'wide' : 'tall'), `这个视口该用${s.wide ? '横版' : '竖版'}，用的却是 ${s.set} 这一套`);
-      expect(Math.abs(s.frame - Math.round(0.3 * (s.count - 1))) <= 1, `滚到 0.3，画的是第 ${s.frame} 帧（共 ${s.count} 帧）`);
+      const fits = s.kind === 'video' ? (s.wide ? ['uhd', 'wide', 'mid'].includes(s.set) : s.set === 'phone') : s.set === (s.wide ? 'wide' : 'tall');
+      expect(fits, `这个视口（${s.wide ? '不是手机' : '手机'}，走的是${s.kind === 'video' ? '视频' : '图片'}那一路）用的却是 ${s.set} 这一套`);
+      expect(Math.abs(s.frame - s.want) <= 1, `滚到 0.3，要画第 ${s.want} 帧，画的是第 ${s.frame} 帧`);
+      expect(s.frame > s.count * 0.1 && s.frame < s.count * 0.6, `滚到 0.3，画的是第 ${s.frame} 帧（共 ${s.count} 帧），不像是这一段`);
       expect(s.lit > 2, `画布是黑的：${JSON.stringify(s)}`);
       expect(s.flat === 'hidden', '影片起来了，平面那张图却没收起来');
       expect(!s.day, '才到第三拍就天亮了');
@@ -255,19 +307,154 @@ export const CHECKS = [
       await shot('night');
       // 实现那一段（S5）的说明最长：它也不能压到清单上。
       await scrollLockTo(page, 0.56);
-      await settle(0.56);
+      await settle();
       await page.waitForTimeout(600);
+      const night = s.frame;
       s = await state();
       expect(s.overlap <= 1, `S5 的说明压到了产物清单上 ${Math.round(s.overlap)} 像素`);
+      expect(s.frame > night, `从 0.3 滚到 0.56，帧号没有往后走（${night} → ${s.frame}）`);
       await shot('s5');
       await scrollLockTo(page, 1);
-      await settle(1);
+      await settle();
       await page.waitForTimeout(600);
       s = await state();
       expect(s.frame === s.count - 1, `滚到头了，画的是第 ${s.frame} 帧，不是最后一帧（${s.count - 1}）`);
       expect(s.day, '滚到头了天还没亮');
       await shot('day');
       expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
+    },
+  },
+  {
+    // 视频那一路：挂上的是视频，手机用手机那一档；往下滚帧号往后走、往回滚往前走，停下来画的正是要画的那一帧；
+    // 中间刷新直接到位；滚到头是最后一帧、天亮。
+    name: 'lock-video',
+    engines: ['chromium'],
+    launch: CHROME,
+    viewports: ['1440', '360'],
+    async run({ page, url, shot, uncaught }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 15000 });
+      if (!(await hasVideoFilm(page))) return;
+      await scrollLockTo(page, 0.3);
+      await page.waitForSelector('[data-lock][data-lock-scene="video"][data-lock-film-ready]', { timeout: 25000 });
+      let s = await settleFilm(page);
+      expect(s.kind === 'video', `挂上的不是视频那一路：${JSON.stringify(s)}`);
+      expect(s.phone ? s.set === 'phone' : ['uhd', 'wide', 'mid'].includes(s.set), `这个视口（${s.phone ? '手机' : '不是手机'}）用的却是 ${s.set} 这一档`);
+      expect(s.frame === s.want, `停在 0.3，要画第 ${s.want} 帧，画的是第 ${s.frame} 帧`);
+      expect(s.frame > s.count * 0.1 && s.frame < s.count * 0.6, `滚到 0.3，画的是第 ${s.frame} 帧（共 ${s.count} 帧），不像是这一段`);
+      expect(s.lit > 2, `画布是黑的：${JSON.stringify(s)}`);
+      expect(!s.day, '才到第三拍就天亮了');
+      await shot('night');
+      // 一小段一小段往下滚：帧号只增不减，每次停下来画的都是要画的那一帧。
+      const start = s.frame;
+      let prev = s.frame;
+      for (const fraction of [0.31, 0.32, 0.33, 0.34, 0.36, 0.4]) {
+        await scrollLockTo(page, fraction);
+        s = await settleFilm(page);
+        expect(s.frame === s.want, `往下滚到 ${fraction}，要画第 ${s.want} 帧，画的是第 ${s.frame} 帧`);
+        expect(s.frame >= prev, `往下滚到 ${fraction}，帧号倒着走了（${prev} → ${s.frame}）`);
+        prev = s.frame;
+      }
+      expect(prev > start, `从 0.3 滚到 0.4，帧号没动（${start} → ${prev}）`);
+      // 往回滚：帧号只减不增。
+      for (const fraction of [0.38, 0.35, 0.33, 0.3, 0.2]) {
+        await scrollLockTo(page, fraction);
+        s = await settleFilm(page);
+        expect(s.frame === s.want, `往回滚到 ${fraction}，要画第 ${s.want} 帧，画的是第 ${s.frame} 帧`);
+        expect(s.frame <= prev, `往回滚到 ${fraction}，帧号往后走了（${prev} → ${s.frame}）`);
+        prev = s.frame;
+      }
+      // 在中间刷新：直接到位，不从头演。
+      await scrollLockTo(page, 0.6);
+      await page.waitForTimeout(300);
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-scene="video"][data-lock-film-ready]', { timeout: 25000 });
+      s = await settleFilm(page);
+      expect(s.frame === s.want && s.frame > s.count * 0.4, `在 0.6 刷新以后画的是第 ${s.frame} 帧（要画第 ${s.want} 帧，共 ${s.count} 帧）`);
+      // 一下子跳到头。
+      await scrollLockTo(page, 1);
+      s = await settleFilm(page);
+      expect(s.frame === s.count - 1, `滚到头了，画的是第 ${s.frame} 帧，不是最后一帧（${s.count - 1}）`);
+      expect(s.day, '滚到头了天还没亮');
+      await shot('day');
+      expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
+    },
+  },
+  {
+    // 视频那一路走不了的三种情形，都要退回图片那一路、页面照常：
+    // 浏览器没有 VideoDecoder；这一档的索引取不到；解出来的画面和压片时记下的颜色对不上（这里把记下的颜色改掉来造）。
+    name: 'lock-video-fallback',
+    engines: ['chromium'],
+    launch: CHROME,
+    viewports: ['1440'],
+    langs: ['zh'],
+    async run({ url, context: own, viewport, uncaught }) {
+      const browser = own.browser();
+      const cases = [
+        ['没有 VideoDecoder', (p) => p.addInitScript(() => delete window.VideoDecoder)],
+        ['索引取不到', (p) => p.route('**/assets/film/*/index.json', (route) => route.abort())],
+        [
+          '解出来的画面不对',
+          (p) =>
+            p.route('**/assets/film/*/index.json', async (route) => {
+              const response = await route.fetch();
+              const index = await response.json();
+              index.probes = Buffer.alloc(Buffer.from(index.probes, 'base64').length, 255).toString('base64');
+              await route.fulfill({ response, json: index });
+            }),
+        ],
+      ];
+      for (const [what, arrange] of cases) {
+        const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+        const fresh = await context.newPage();
+        const errors = [];
+        fresh.on('pageerror', (error) => errors.push(error.message));
+        try {
+          await arrange(fresh);
+          await fresh.goto(url, { waitUntil: 'load' });
+          await fresh.waitForSelector('[data-lock][data-lock-live]', { timeout: 15000 });
+          if (!(await hasVideoFilm(fresh))) return;
+          await scrollLockTo(fresh, 0.3);
+          await fresh.waitForSelector('[data-lock][data-lock-scene="film"][data-lock-film-ready]', { timeout: 25000 }).catch(() => {});
+          const s = await settleFilm(fresh, { timeout: 15000 });
+          expect(s.scene === 'film' && s.kind === 'images', `${what}：应当退回图片那一路，现在是 ${JSON.stringify(s)}`);
+          expect(s.lit > 2, `${what}：退回图片以后画布是黑的`);
+          expect(Math.abs(s.frame - s.want) <= 1, `${what}：退回图片以后要画第 ${s.want} 帧，画的是第 ${s.frame} 帧`);
+          expect(errors.length === 0, `${what}：有未捕获的异常：${errors.join(' | ')}`);
+        } finally {
+          await context.close();
+        }
+      }
+      expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
+    },
+  },
+  {
+    // 没滚到过闸之前，视频那一路只取一个关键帧（要文件的一小段）；滚进去以后各段的文件才开始下。
+    name: 'video-lazy',
+    engines: ['chromium'],
+    launch: CHROME,
+    viewports: ['1440'],
+    langs: ['zh'],
+    async run({ page, url }) {
+      const files = [];
+      page.on('request', (request) => {
+        if (request.url().includes('/assets/film/') && request.url().endsWith('.bin')) files.push({ name: request.url().split('/assets/film/')[1], range: request.headers().range ?? null });
+      });
+      await page.goto(url, { waitUntil: 'load' });
+      if (!(await hasVideoFilm(page))) return;
+      await page.waitForTimeout(7000);
+      expect(files.length === 1 && files[0].range, `停在首屏七秒，视频的文件应当只取了一个关键帧（带 Range 的一次请求），实际：${JSON.stringify(files)}`);
+      await scrollLockTo(page, 0.3);
+      await page.waitForSelector('[data-lock][data-lock-scene="video"][data-lock-film-ready]', { timeout: 25000 });
+      const segments = await page.evaluate(async () => {
+        const canvas = document.querySelector('[data-lock-canvas]');
+        const film = JSON.parse(canvas.dataset.film);
+        const index = await (await fetch(`${film.base}${film.tiers[canvas.dataset.filmSet].dir}/index.json`)).json();
+        return index.segments.length;
+      });
+      await page.waitForFunction((want) => performance.getEntriesByType('resource').filter((e) => e.name.endsWith('.bin')).length >= want, segments * 2, { timeout: 30000 }).catch(() => {});
+      const whole = new Set(files.filter((f) => !f.range).map((f) => f.name));
+      expect(whole.size === segments * 2, `滚进过闸以后，${segments} 段应当各下关键帧和其余帧两个文件，实际下了 ${whole.size} 个`);
     },
   },
   {
@@ -468,7 +655,7 @@ export const CHECKS = [
     async run({ page, url, t, shot }) {
       for (const size of [
         { width: 390, height: 664, mode: 'stage' },
-        { width: 375, height: 600, mode: 'stage', set: 'tall' },
+        { width: 375, height: 600, mode: 'stage', set: ['tall', 'phone'] },
         { width: 375, height: 548, mode: 'static' },
         { width: 844, height: 390, mode: 'static' },
         { width: 720, height: 390, mode: 'static' },
@@ -513,7 +700,7 @@ export const CHECKS = [
           if (size.set && fraction === 0.56) {
             await page.waitForSelector('[data-lock][data-lock-scene]', { timeout: 6000 }).catch(() => {});
             const set = await page.evaluate(() => document.querySelector('[data-lock-canvas]').dataset.filmSet ?? null);
-            if (set !== null) expect(set === size.set, `${where}：这是手机，应当用竖版，用的却是 ${set}`);
+            if (set !== null) expect(size.set.includes(set), `${where}：这是手机，应当用手机的那一套，用的却是 ${set}`);
           }
         }
       }

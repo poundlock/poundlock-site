@@ -51,10 +51,23 @@ export function startServer({ port = 4173, host = false, dir = 'dist' } = {}) {
       res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }).end('not found');
       return;
     }
-    res.writeHead(200, {
+    const headers = {
       'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream',
       'cache-control': 'no-store',
-    });
+      'accept-ranges': 'bytes',
+    };
+    // 只要文件的一段（影片的播放器只取一个关键帧时这样要）：和线上的 GitHub Pages 一样照给。
+    const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range ?? '');
+    const size = statSync(file).size;
+    if (range && Number(range[1]) < size) {
+      const start = Number(range[1]);
+      const end = range[2] === '' ? size - 1 : Math.min(size - 1, Number(range[2]));
+      res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': String(end - start + 1) });
+      if (req.method === 'HEAD') res.end();
+      else createReadStream(file, { start, end }).pipe(res);
+      return;
+    }
+    res.writeHead(200, headers);
     if (req.method === 'HEAD') res.end();
     else createReadStream(file).pipe(res);
   });

@@ -400,6 +400,7 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
       if (s.dead) return;
       if (raw.count !== table.length) throw new Error('索引的帧数和取帧表对不上');
       s.index = prepareIndex(raw);
+      canvas.dataset.frames = String(raw.count);
       if (raw.probes) s.index.probes = fromBase64(raw.probes);
       s.data = s.index.segments.map(() => ({ key: null, rest: null }));
       const config = { codec: raw.codec, codedWidth: raw.width, codedHeight: raw.height, description: fromBase64(raw.description), optimizeForLatency: true };
@@ -494,6 +495,7 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
       shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * 7));
       if (before !== null && shown !== before) direction = shown > before ? 1 : -1;
       wanted = frameAtTable(table, shown);
+      canvas.dataset.want = String(wanted);
       if (session.index) {
         paint(session, false);
         schedule(session);
@@ -520,6 +522,8 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
       delete canvas.dataset.frame;
       delete canvas.dataset.filmSet;
       delete canvas.dataset.filmKind;
+      delete canvas.dataset.frames;
+      delete canvas.dataset.want;
     },
   };
 }

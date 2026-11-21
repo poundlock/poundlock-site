@@ -178,6 +178,8 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
       active = 0;
       drawn = -1;
       canvas.dataset.filmSet = name;
+      canvas.dataset.filmKind = 'images';
+      canvas.dataset.frames = String(set.count);
       pump();
     }
     if (shown !== null) wanted = indexAt(shown);
@@ -210,6 +212,7 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
       last = now;
       shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * 7));
       wanted = indexAt(shown);
+      canvas.dataset.want = String(wanted);
       hurry(now);
       paint(false);
       // 页头固定在最上面，压着这块画面：天亮以后画面顶上是亮的，它换成浅色段的样子。
@@ -235,6 +238,9 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
       root.removeAttribute('data-lock-film-ready');
       delete canvas.dataset.frame;
       delete canvas.dataset.filmSet;
+      delete canvas.dataset.filmKind;
+      delete canvas.dataset.frames;
+      delete canvas.dataset.want;
     },
   };
 }
