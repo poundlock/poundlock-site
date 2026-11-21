@@ -40,5 +40,7 @@ if (isMain()) {
   }
   const ok = await checkHealth({ siteUrl, version });
   console.log(ok ? `线上是 ${version}。` : `等了五分钟，线上还不是 ${version}。`);
-  process.exit(ok ? 0 : 1);
+  // 不调 process.exit：刚取过 HTTPS 就强行退出，Node 24 在 Windows 上会在退出时崩（退出码 127）。
+  // 只记下退出码，让进程自己收完连接再退。
+  process.exitCode = ok ? 0 : 1;
 }
