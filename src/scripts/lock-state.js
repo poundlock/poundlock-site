@@ -11,6 +11,10 @@ const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 // x 走到 [a, b] 的哪了，带缓动；a 之前是 0，b 之后是 1。
 const phase = (x, a, b) => ease(clamp01((x - a) / (b - a)));
+// 船走动用更平的缓动：最快处是平均速度的 1.57 倍（上面那个三次的是 3 倍）。
+// 滚同样一小段，船走的距离差得太多，滚一下画面就会猛地窜出去一大截。
+const easeMove = (t) => 0.5 - 0.5 * Math.cos(Math.PI * t);
+const glide = (x, a, b) => easeMove(clamp01((x - a) / (b - a)));
 
 // 一室里四个动作各占的区间（0 到 1 是这一室的全程）。
 export const PHASES = {
@@ -34,7 +38,7 @@ export function lockStateAt(progress, n = 8) {
 
   for (let i = 0; i < n; i++) {
     const s = local(i);
-    if (u >= i) boat = i - 0.5 + phase(s, ...PHASES.move);
+    if (u >= i) boat = i - 0.5 + glide(s, ...PHASES.move);
     water.push(phase(s, ...PHASES.rise));
     // 第 i 道闸门：下游那一室注满以后打开（第一道一开始就开着），船过去以后在身后关上。
     const opened = i === 0 ? 1 : phase(local(i - 1), ...PHASES.open);
@@ -44,7 +48,7 @@ export function lockStateAt(progress, n = 8) {
 
   // 收尾：船驶出最高一级，天亮。
   const end = clamp01((u - (n - 1) - LAST_SHARE) / (1 - LAST_SHARE));
-  if (end > 0) boat = n - 0.5 + phase(end, 0, 0.75) * 1.7;
+  if (end > 0) boat = n - 0.5 + glide(end, 0, 0.75) * 1.7;
   const day = phase(end, 0.3, 1);
 
   // 船浮在它所在那一室的水面上。

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lockStateAt } from '../src/scripts/lock-state.js';
+import { PHASES, lockStateAt } from '../src/scripts/lock-state.js';
 import { beatAt } from '../src/scripts/lock.js';
 
 // 把整段滚动细细地走一遍。
@@ -99,4 +99,22 @@ test('天亮只发生在最后一拍', () => {
 test('进度超出 0 到 1 时夹住', () => {
   assert.deepEqual(lockStateAt(-3), lockStateAt(0));
   assert.deepEqual(lockStateAt(7), lockStateAt(1));
+});
+
+test('船走动的最快处不超过平均速度的 1.7 倍', () => {
+  // 滚同样一小段，船前进多少：走动那一段里最快的地方和平均比。差得太多，滚一下画面就猛地窜出去。
+  for (const chamber of [0, 3, 6]) {
+    const from = chamber / N;
+    const to = (chamber + PHASES.move[1]) / N;
+    const steps = 400;
+    let peak = 0;
+    for (let k = 0; k < steps; k++) {
+      const a = lockStateAt(from + ((to - from) * k) / steps).boat;
+      const b = lockStateAt(from + ((to - from) * (k + 1)) / steps).boat;
+      peak = Math.max(peak, b - a);
+    }
+    const total = lockStateAt(to).boat - lockStateAt(from).boat;
+    assert.ok(Math.abs(total - 1) < 1e-9, `第 ${chamber + 1} 室走动一段应当正好前进一室，实际 ${total}`);
+    assert.ok(peak / (total / steps) <= 1.7, `第 ${chamber + 1} 室最快处是平均的 ${(peak / (total / steps)).toFixed(2)} 倍`);
+  }
 });
