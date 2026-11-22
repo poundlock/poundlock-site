@@ -722,7 +722,11 @@ export const CHECKS = [
       const hasFilm = await page.evaluate(() => Boolean(document.querySelector('[data-lock-canvas]').dataset.film));
       if (!hasFilm) return;
       await page.waitForTimeout(7000);
-      expect(frames >= 1 && frames <= 20, `停在首屏七秒，下了 ${frames} 帧影片（应当只下头一遍稀的，十几帧）`);
+      // 这个内核走的是视频那一路（解得了 H.264）就不归这一条管，由 video-lazy 核
+      const kind = await page.evaluate(() => document.querySelector('[data-lock-canvas]').dataset.filmKind ?? null);
+      if (kind === 'video') return;
+      // 头一遍稀的是每隔十六帧一帧加最后一帧：图片那一套三百来张时是二十一张。
+      expect(frames >= 1 && frames <= 24, `停在首屏七秒，下了 ${frames} 帧影片（应当只下头一遍稀的，二十来帧）`);
       await scrollLockTo(page, 0.3);
       await page.waitForTimeout(6000);
       expect(frames > 150, `滚进过闸六秒以后只下了 ${frames} 帧，其余的没有补上`);

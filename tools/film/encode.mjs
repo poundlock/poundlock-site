@@ -39,6 +39,7 @@ const from = path.resolve(value('--from', '.shots/film/master4k'));
 const stride = Number(value('--stride', '1'));
 const wanted = value('--tiers', '');
 const webpQuality = Number(value('--webp-quality', '72'));
+const crfBoost = Number(value('--crf-boost', '0')); // 各档的 CRF 统一加多少（试体积用）
 const out = path.resolve(value('--out', path.join(ROOT, 'src', 'assets', 'film')));
 
 const run = (program, argv, what) => {
@@ -91,10 +92,10 @@ try {
   const resize = (width, height) => `scale=${width}:${height}:flags=lanczos`;
   // geometry：从母版到这一档的画面，只管裁和缩（还是 RGB）。
   const TIERS = [
-    { name: 'uhd', width: masterW, height: uhdH, geometry: `crop=${masterW}:${uhdH}:0:${even((masterH - uhdH) / 2)}`, focus: [FOCUS_X, 0.5], crf: 23 },
-    { name: 'wide', width: even(2880 * k), height: even(2160 * k), geometry: resize(even(2880 * k), even(2160 * k)), focus: [FOCUS_X, 0.5], crf: 22 },
-    { name: 'mid', width: even(1920 * k), height: even(1440 * k), geometry: resize(even(1920 * k), even(1440 * k)), focus: [FOCUS_X, 0.5], crf: 22 },
-    { name: 'phone', width: even(1344 * k), height: even(1680 * k), geometry: `${phoneCrop},${resize(even(1344 * k), even(1680 * k))}`, focus: [0.5, 0.5], crf: 24 },
+    { name: 'uhd', width: masterW, height: uhdH, geometry: `crop=${masterW}:${uhdH}:0:${even((masterH - uhdH) / 2)}`, focus: [FOCUS_X, 0.5], crf: 26 },
+    { name: 'wide', width: even(2880 * k), height: even(2160 * k), geometry: resize(even(2880 * k), even(2160 * k)), focus: [FOCUS_X, 0.5], crf: 25 },
+    { name: 'mid', width: even(1920 * k), height: even(1440 * k), geometry: resize(even(1920 * k), even(1440 * k)), focus: [FOCUS_X, 0.5], crf: 25 },
+    { name: 'phone', width: even(1344 * k), height: even(1680 * k), geometry: `${phoneCrop},${resize(even(1344 * k), even(1680 * k))}`, focus: [0.5, 0.5], crf: 27 },
   ].filter((tier) => !wanted || wanted.split(',').includes(tier.name));
   const SETS = [
     { name: 'wide', dir: 'frames-wide', width: even(1920 * k), height: even(1440 * k), step: 3, focus: [FOCUS_X, 0.5] },
@@ -114,7 +115,7 @@ try {
     const filter = `${tier.geometry},scale=${COLOR},format=yuv420p`;
     run(
       'ffmpeg',
-      ['-y', '-loglevel', 'error', ...input, '-vf', filter, '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-crf', String(tier.crf), '-g', String(GOP), '-keyint_min', String(GOP), '-sc_threshold', '0', '-bf', '0', '-x264-params', 'aud=1', ...TAGS, '-f', 'h264', raw],
+      ['-y', '-loglevel', 'error', ...input, '-vf', filter, '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-crf', String(tier.crf + crfBoost), '-g', String(GOP), '-keyint_min', String(GOP), '-sc_threshold', '0', '-bf', '0', '-x264-params', 'aud=1', ...TAGS, '-f', 'h264', raw],
       `压 ${tier.name} 这一档`,
     );
     const units = accessUnits(splitAnnexB(new Uint8Array(readFileSync(raw))));

@@ -32,20 +32,28 @@ poundlock 的宣传官网：一页落地页，中英双语。为什么长这样�
 
 ## 影片（「过闸」那一节的画面）
 
-过闸不是浏览器里实时画的，是离线渲染好的一串画面，页面按滚动位置换帧。
+过闸不是浏览器里实时画的，是离线渲染好的一串画面，页面按滚动位置换帧。现在是第二版（2026-11-22）：4K 母版，帧按「画面变了多少」取，主路是 H.264 视频。
 
-- `tools/film/render.py`（Blender 脚本，场景全部是程序生成的，没有外部素材）渲出母版 PNG，放在 `.shots/film/master/`，不进仓库。
-- `tools/film/encode.mjs` 把母版压成 `src/assets/film/` 下的两套 WebP 和 `manifest.json`，这些进仓库。横版就是整幅母版（4:3，每帧都要）：窗口比 16:9 高的时候要用到上下那两条，所以不裁；竖版取中间一条、隔一帧取一帧，给手机。没有 `manifest.json` 时页面不带影片，用平面的那张图。
-- 重渲的三步：
-  1. `node tools/film/states.mjs --frames 240 > .shots/film/states-240.json`
-  2. `blender -b --factory-startup --python tools/film/render.py -- --states .shots/film/states-240.json --out .shots/film/master --size 1920x1440 --samples 200 --quality 2 --resume 1`
-  3. `node tools/film/encode.mjs --from .shots/film/master`
-- 正式渲染一帧四十多秒（RTX 5090），240 帧三小时左右。中途断了，原样再跑一遍第 2 步，`--resume 1` 会跳过已经渲出来的帧。
-- 正式渲之前先整段预演一遍：第 2 步换成 `--size 480x360 --samples 24 --quality 1`，十分钟，抽帧看镜头有没有穿过东西、节拍对不对。
+- **取帧表**：`src/scripts/film-schedule.js`。不按进度均匀取，从上一帧往前走，到某一项变化正好到上限就取下一帧：船每帧最多前进 0.4 米，水位、闸门、天色、进度本身各有上限（`LIMITS`）。现在是 931 帧。渲染、压片、页面三处用的是同一张表，改了 `LIMITS` 或 `src/scripts/lock-state.js` 的节拍，影片要重渲。
+- **渲染**：`tools/film/render.py`（Blender 脚本，场景全部是程序生成的，没有外部素材）渲出母版 PNG（3840×2880），放在 `.shots/film/master4k/`，不进仓库，931 帧 10 GB 上下。
+- **压片**：`tools/film/encode.mjs` 把母版压成 `src/assets/film/` 下的几档视频、两套后备图片和 `manifest.json`，这些进仓库：
+  - 视频四档：`uhd` 3840×2160（从母版中间裁成 16:9）、`wide` 2880×2160、`mid` 1920×1440、`phone` 1344×1680（以船为中心裁成 4:5）。H.264，关键帧每 8 帧一个、不用 B 帧，每一帧都能单独定位：一档切成 10 段，每段一个关键帧文件、一个其余帧文件，外加 `index.json`（每一帧多大、每个关键帧缩成 4×4 的颜色）。CRF 是试过的（宽档 22、25、28 的结构相似度 0.953、0.944、0.934，放大看分不出来），各档的值写在脚本里。
+  - 后备图片两套（`frames-wide/` 每隔 3 帧一张、`frames-tall/` 每隔 6 帧一张）：浏览器走不了视频那一路时用。目录名不能和视频的档重名（有一档叫 `wide`），脚本里重名会报错。
+  - 现在的体积：`uhd` 63 MB、`wide` 60 MB、`mid` 31 MB、`phone` 18 MB，后备图片 37 MB，整个目录 200 MB 上下。访客只下自己那一档，而且滚进这一节才开始整段下（见下面「踩过的坑」）。
+- **重渲的四步**：
+  1. `node tools/film/states.mjs --schedule > .shots/film/states-v2.json`
+  2. 先抽着看镜头：`node tools/film/states.mjs --schedule --every 30 > .shots/film/states-v2-sparse.json`，用第 3 步的命令换成 `--states .shots/film/states-v2-sparse.json --size 640x480 --samples 24 --quality 1`，一两分钟。
+  3. `blender -b --factory-startup --python tools/film/render.py -- --states .shots/film/states-v2.json --out .shots/film/master4k --size 3840x2880 --samples 96 --threshold 0.04 --quality 2 --resume 1 --order coarse`
+  4. `node tools/film/encode.mjs --from .shots/film/master4k`
+- **渲染要一整天**：4K 一帧 80 到 150 秒（RTX 5090，日出那几帧最慢），931 帧二十三个小时左右。`--order coarse` 先每隔八帧渲一遍、再补每隔四帧、两帧，最后补齐：任何时候停下来，手里都是完整的一段，可以用 `encode.mjs --stride 8` 先压出来看。中途断了原样再跑第 3 步，`--resume 1` 跳过已经渲出来的帧。
+- **省时的设置是量过的**：噪点阈值 0.04 比 0.02 省三成、画面看不出差别；后期（柔光、色散）挪到显卡上算、雾的步长加倍都不省时间。
+- **镜头只留原画面的左边 82%**：`tools/film/lockfilm/world.py` 的 `FRAME_KEEP`（感光面裁窄、画幅往左偏，透视和景深不变）。页面把船摆在画面宽度的 61% 处、左边留给字，原来右边那 18% 在宽屏版式里从来不露出来。压片脚本的 `FOCUS_X` 和它是同一个数，改一处要改另一处。
+- **页面怎么放**：`src/scripts/lock-video.js` 用 `VideoDecoder`（WebCodecs）让显卡解码，解出来的帧画到画布上：按画布大小挑一档（铺满时不用放大的最小一档，手机只用 `phone`），先下访客所在的那一段和下一段，再下别的段的关键帧，最后补其余帧；要画的那一组先解，再按滚动方向备下一组。走不通（没有 `VideoDecoder`、这一档解不了、解出来的头一帧和记下的颜色对不上、十五秒没画出头一帧）就退回 `lock-film.js` 的图片那一路，再不行是平面的那张图。量过：不节流的 Chrome 里滚这一节 115 到 120 帧，往回滚每一帧都对得上。
+- **在本机看视频那一路要用装了的 Chrome**：Playwright 自带的 Chromium 没有 H.264 解码器，在它上面页面走的是图片那一路；`browser-check.js` 里视频那几条核对用 `channel: 'chrome'`。
+- 正式渲之前先整段预演一遍：第 3 步换成 `--size 640x480 --samples 24 --quality 1`，也用 `--order coarse`，二十分钟左右能先拿到每隔八帧的那一遍。
 - Blender 是免安装包，在开发机上的位置记在主仓库的 `CLAUDE.md`。
-- 影片和页面是同一套节拍：每一帧的状态取自 `src/scripts/lock-state.js`。改了那个函数，影片要重渲。
 - 「天亮」有一对要一起改的数：`render.py` 的 `sky_time`（天色怎么走）和 `src/scripts/lock-film.js` 的 `DAY_AT`（页头在哪一刻换成浅色）。
-- 影片有二十来 MB，每重渲一次仓库历史就多这么多。别为小改动重渲。
+- 影片有两百来 MB，每重渲、重压一次仓库历史就多这么多。别为小改动重渲；只改了页面怎么放，用不着重压。
 - 草是一块块的草皮（每块两千根草叶），不是一丛丛单独摆的：单独摆有两百万个物体，每帧光整理场景就要八秒。
 
 ## 部署
@@ -67,7 +75,7 @@ poundlock 的宣传官网：一页落地页，中英双语。为什么长这样�
 
 - **过闸那个粘住的舞台只在放得下的视口里开。** 判据是 `src/scripts/stage.js` 的 `STAGE_QUERY`：窄屏版式要 560 高，宽屏版式要 520 高。放不下（小手机、横过来的手机、把浏览器放大到 200%）时这一节是静态的清单，八段都读得到。它的样式全部挂在 `<html>` 的 `stage-ok` 上：页头的内联脚本一开始就标好，`lock.js` 在视口变化时开、收；过闸的模块抛错、入口脚本取不到时会撤掉它。改这一节的样式时别再直接挂 `motion-ok`（`tests/sections.test.js` 会拦）。
 - **核对工具默认的手机视口（360×740）比真手机高。** 那是不带浏览器工具栏的高度；真的 iPhone 上可用的高度是 660 上下，iPhone SE 只有 550 上下。矮视口专门由 `lock-short` 这条核对跑。动过闸的版式之后要看它。
-- **影片分两遍下。** 离过闸还有一屏时只下头一遍稀的（十几帧，一两 MB），访客真的滚进来了才补齐其余的（`lock-film.js` 的 `fill`）。别改回一挂上就全下：只看一眼首屏就走的人也会下二十多 MB，GitHub Pages 每月有 100 GB 的流量软上限。
+- **影片要等访客滚进来才整段下。** 离过闸还有一屏时，视频那一路只取要画的那一帧附近的一个关键帧（按字节范围取文件的一小段），图片那一路只下头一遍稀的（二十来张）；访客真的滚进来了才整段下（两路都在 `fill` 里）。别改回一挂上就全下：只看一眼首屏就走的人也会下几十 MB，GitHub Pages 每月有 100 GB 的流量软上限。
 - **带锚点的地址刷新时不能再补定位。** `main.js` 的 `reanchor` 只在新打开页面时补（见下面 Safari 那一条）；刷新、后退回来时浏览器恢复的是离开前的位置，补了会把人拉回那一节的开头。
 - **帧率看门狗会误判。** 首屏的水面在帧率撑不住时会换成静态的底。出过一次事：别的模块在页面刚打开时加载，卡了将近一秒，水面被当成「设备画不动」关掉了。现在看门狗头 2.5 秒不计、单独一次卡顿不计；重的东西（过闸的画面）等快滚到再加载。再加重模块时照这个做。
 - **无头浏览器的帧率不能信。** 没有显卡时 WebGL 走软件渲染，慢得多。`browser-check.js` 给 Chromium 加了走显卡的启动参数；`--perf` 量出来的数只在有显卡的机器上有参考价值，而开发机的显卡又太好，弱设备上什么样没量过。

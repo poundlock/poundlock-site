@@ -120,7 +120,9 @@ export function probeMatches(expected, actual, tolerance = 28) {
   return total / expected.length <= tolerance;
 }
 
-const BUDGET = { uhd: 16, wide: 24, mid: 32, phone: 24 }; // 各档缓存几帧解好的画面（一帧 4K 的画面三十多 MB）
+// 各档缓存几帧解好的画面。一帧 2880×2160 的画面约 25 MB、3840×2160 约 33 MB，都在显存里：
+// 缓存两组（16 帧）左右，大屏那两档占四百 MB 上下，普通电脑也放得下。往回滚到缓存外，现解一组只要二三十毫秒。
+const BUDGET = { uhd: 12, wide: 16, mid: 24, phone: 24 };
 const PARALLEL = 2; // 同时下几个文件
 const PATIENCE = 15000; // 开了一档这么久还没画出头一帧（索引没到、数据没到、解不出来），就算这一路走不通
 const SLOW_GROUP = 450; // 解一组花了这么多毫秒算慢
