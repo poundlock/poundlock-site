@@ -210,6 +210,13 @@ uniform float u_caustic;
 uniform vec3 u_water;
 uniform float u_mix;
 uniform float u_alpha;
+uniform float u_wl;
+uniform float u_aspect;
+
+// 出水的水线：几道长短不一的波叠起来慢慢走（x 按画面的高归一）。水面以上那一层和水线下的光用同一条，两边才对得上
+float waterWave(float x, float t) {
+  return 0.0045 * sin(x * 19.0 + t * 1.5) + 0.0025 * sin(x * 47.0 - t * 2.2) + 0.0012 * sin(x * 113.0 + t * 3.3);
+}
 
 vec2 hash2(vec2 p) {
   p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -264,6 +271,17 @@ void main() {
     gl_FragColor = c * u_alpha;
     return;
   }
+  if (u_mode > 2.5) {
+    // 水面以上那一层：只露水线以上（水线跟着波起伏，边上软一个多像素）；贴着水线那一窄条跟着波纹上下晃一点，像隔着水面的弯月面
+    float top = 1.0 - v_screen.y;
+    float x = v_screen.x * u_aspect;
+    float d = u_wl + waterWave(x, u_time) - top;
+    float near = smoothstep(0.035, 0.0, d);
+    vec2 uv = v_uv + vec2(0.0, near * 0.004 * sin(x * 61.0 + u_time * 2.4));
+    vec4 c = texture2D(u_tex, uv);
+    gl_FragColor = c * smoothstep(-0.0012, 0.0012, d);
+    return;
+  }
   // 鱼：两套序列帧按 u_mix 过渡（停着 → 游着），整条蒙一层这里的水色
   vec4 a = texture2D(u_tex, v_uv);
   vec4 b = texture2D(u_tex2, v_uv);
@@ -297,6 +315,11 @@ uniform vec3 u_deep;
 uniform vec2 u_res;
 
 float hash(float n) { return fract(sin(n) * 43758.5453); }
+// 出水的水线：几道长短不一的波叠起来慢慢走（x 按画面的高归一）。水面以上那一层和水线下的光用同一条，两边才对得上
+float waterWave(float x, float t) {
+  return 0.0045 * sin(x * 19.0 + t * 1.5) + 0.0025 * sin(x * 47.0 - t * 2.2) + 0.0012 * sin(x * 113.0 + t * 3.3);
+}
+
 
 void main() {
   float kind = v_info.x;
@@ -349,18 +372,22 @@ void main() {
     return;
   }
   if (kind > 4.5) {
-    // 水面：从水下往上看，画面顶上一条晃动的银亮水面（底面的全反射和碎光）；出水时水线上一道亮边
+    // 水面。phase 是这里有多少水面（浅水那一段），alpha 是出没出水（1 出水了），v_info.w 是水线离画面顶多远。
     vec2 s = v_uv;
     float top = 1.0 - s.y;
-    float wl = v_info.w;
-    float rip = sin(s.x * 38.0 + u_time * 1.6 + sin(s.x * 9.0 - u_time) * 2.0) * 0.5 + 0.5;
-    float rip2 = sin(s.x * 91.0 - u_time * 2.3 + top * 40.0) * 0.5 + 0.5;
-    float band = smoothstep(0.1, 0.0, top - wl) * step(wl, top) * phase;
-    float glow = band * (0.3 + 0.5 * rip * rip2);
-    float edge = exp(-pow((top - wl) / 0.003, 2.0)) * alpha;
-    float m = glow * 0.2 + edge * 0.35;
-    // 出水以后水线以下压暗一点（水面下本来就比水上暗），不然浅水那一段的水色太亮，底下一截会发白
-    float shade = alpha * (0.3 + 0.25 * smoothstep(wl, 1.0, top)) * smoothstep(wl, wl + 0.04, top);
+    float x = s.x * u_res.x / u_res.y;
+    float line = v_info.w + waterWave(x, u_time) * alpha;
+    float below = top - line;
+    float rip = sin(x * 38.0 + u_time * 1.6 + sin(x * 9.0 - u_time) * 2.0) * 0.5 + 0.5;
+    float rip2 = sin(x * 91.0 - u_time * 2.3 + top * 40.0) * 0.5 + 0.5;
+    // 出水以前：画面顶上一窄条从下往上看到的水面底面，晃着碎光
+    float band = phase * (1.0 - alpha) * smoothstep(0.06, 0.0, top) * (0.25 + 0.6 * rip * rip2);
+    // 出水以后：水线下面紧贴着一窄条水面底面的碎光（全反射），再往下立刻压暗（水面下本来就比水上暗；
+    // 原来压暗是从水线往下慢慢加深，头上六十来像素没压住，成了一条亮青色的带子，看着假）
+    float tir = alpha * smoothstep(0.0, 0.002, below) * smoothstep(0.022, 0.0, below) * (0.3 + 0.7 * rip * rip2);
+    float edge = alpha * exp(-pow(below / 0.0016, 2.0));
+    float m = band * 0.22 + tir * 0.16 + edge * 0.22;
+    float shade = alpha * (0.34 + 0.24 * smoothstep(0.0, 0.6, below)) * smoothstep(0.0, 0.003, below);
     gl_FragColor = vec4(u_light * m + u_deep * shade, shade);
     return;
   }
@@ -437,7 +464,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
   if (!quadProg || !fxProg) return null;
 
   const base = m.base || '';
-  const uq = uniforms(gl, quadProg, ['u_rot', 'u_half', 'u_rect', 'u_uv', 'u_tex', 'u_aux', 'u_tex2', 'u_mode', 'u_time', 'u_world', 'u_viewH', 'u_sway', 'u_caustic', 'u_water', 'u_mix', 'u_alpha']);
+  const uq = uniforms(gl, quadProg, ['u_wl', 'u_aspect', 'u_rot', 'u_half', 'u_rect', 'u_uv', 'u_tex', 'u_aux', 'u_tex2', 'u_mode', 'u_time', 'u_world', 'u_viewH', 'u_sway', 'u_caustic', 'u_water', 'u_mix', 'u_alpha']);
   const uf = uniforms(gl, fxProg, ['u_time', 'u_light', 'u_deep', 'u_res']);
   const aQuad = gl.getAttribLocation(quadProg, 'a_pos');
   const fxA = { pos: gl.getAttribLocation(fxProg, 'a_pos'), uv: gl.getAttribLocation(fxProg, 'a_uv'), info: gl.getAttribLocation(fxProg, 'a_info') };
@@ -817,8 +844,8 @@ export function mountReef(root, canvas, { onFail } = {}) {
     gl.bindBuffer(gl.ARRAY_BUFFER, quad);
     gl.enableVertexAttribArray(aQuad);
     gl.vertexAttribPointer(aQuad, 2, gl.FLOAT, false, 0, 0);
-    gl.enable(gl.SCISSOR_TEST);
-    gl.scissor(0, Math.round(H - dy), W, Math.round(dy));
+    gl.uniform1f(uq.u_wl, dy / H);
+    gl.uniform1f(uq.u_aspect, W / H);
     const [a, b] = visibleTiles(layer, camX, W / H, m.viewH);
     for (let i = a; i <= b; i++) {
       const t = tex(tileKey('above', i));
@@ -827,9 +854,8 @@ export function mountReef(root, canvas, { onFail } = {}) {
       const x1 = x0 + layer.tileM * scale;
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, t.tex);
-      drawQuad([Math.floor(x0) - 0.5, slide, Math.ceil(x1) + 0.5, H + slide], [0, 0, 1, 1], 0);
+      drawQuad([Math.floor(x0) - 0.5, slide, Math.ceil(x1) + 0.5, H + slide], [0, 0, 1, 1], 3);
     }
-    gl.disable(gl.SCISSOR_TEST);
   };
 
   const drawFish = (pose, water, above, dy) => {
