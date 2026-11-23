@@ -84,9 +84,9 @@ poundlock 的宣传官网：一页落地页，中英双语。为什么长这样�
 部署目标写在主仓库的 `workspace.json` 里，两个：
 
 - **`prod`：正式地址 `https://poundlock.irmox.com/`**（2026-11-23 起）。放在一台服务器上，Cloudflare 橙云在前面；服务器地址、端口、部署用户、目录都在清单里，服务器和 Cloudflare 上怎么配的记在主仓库 `CLAUDE.md`，不写进这个仓库（它是公开的）。
-- `pages`：原来的 GitHub Pages 地址（官网仓库 `gh-pages` 分支的根目录）。2026-11-21 到 11-23 是正式地址，换到 `prod` 以后还在线上、没再更新；以后怎么处理（改成跳到新地址，或者关掉）由用户定，定之前别往上部署，免得两个地址的内容不一样。
+- `pages`：原来的 GitHub Pages 地址（官网仓库 `gh-pages` 分支的根目录），2026-11-21 到 11-23 是正式地址。2026-11-23 起上面放的是跳到新地址的跳转页（`deploy/redirect.js`，用户定的「都换过去」）：首页、英文页、别的路径（404 页）都用脚本带着路径、查询和锚点跳到新地址的同一处，关了脚本靠 meta refresh；每页标新地址是规范地址、noindex。GitHub Pages 做不了服务器端的 301，只能这样。官网改了不用再部署它（跳转页不随官网变）；改了跳转页本身才 `wellyard deploy site --to pages`，验收用同一个 `deploy/health.js`（`SITE_URL` 是旧地址，跳转页也写 `version.json`），再打开旧地址看一眼确实跳过去了。`deploy/deploy.js`（往 Pages 推整站）留着没删，`redirect.js` 复用它推 `gh-pages` 的那段。
 
-- **上线、回滚只走 Wellyard**：`wellyard deploy site --to prod`（会话里用 `/wellyard:deploy`）。不要直接跑 `deploy/server.js`、`deploy/deploy.js`：直接跑不记部署 tag。
+- **上线、回滚只走 Wellyard**：`wellyard deploy site --to prod`（会话里用 `/wellyard:deploy`）。不要直接跑 `deploy/` 下的脚本：直接跑不记部署 tag。
 - **部署前检查**：`node --test` 和 `node tools/browser-check.js --engines chromium,webkit,firefox` 都要过。
 - **`prod` 的部署命令做了什么**：`node deploy/server.js` 按 `SITE_URL` 把页面生成到系统临时目录，写一个 `version.txt`（这次的提交），打成压缩包，由 `deploy/remote.js` 一条 ssh 传过去：服务器上解到 `REMOTE_DIR/releases/<版本>-<秒>-<进程号>/`、核对 `version.txt`、原子地把软链接 `current` 换过去、留最近 3 个发布（`current` 指着的永远不删）。切换之前任何一步失败都不动 `current`，线上还是旧版本；切换以后清旧发布失败只警告、照样算成功。`REMOTE_DIR` 里除了 `releases/`、`current` 还有别的东西时拒绝部署（防写错指到别的站点上）。加 `--dry-run` 只打印要做什么。`remote.js` 是照 Wellyard 官网（同一台服务器上的另一个站）那份写的。
 - **部署要本机有部署密钥**（`SSH_KEY`，在哪见主仓库 `CLAUDE.md`），ssh 不弹密码、不自动信任没见过的主机密钥：换了电脑先手动 ssh 一次核对指纹，再把那台电脑自己的部署公钥加到服务器上（做法见主仓库 `CLAUDE.md`）。

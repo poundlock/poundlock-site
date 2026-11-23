@@ -2,7 +2,7 @@
 
 [poundlock](https://github.com/poundlock/poundlock-skills) 的官网：一页落地页，中文和英文各一页。
 
-线上地址：<https://poundlock.github.io/poundlock-site/>（英文页在 [`/en/`](https://poundlock.github.io/poundlock-site/en/)）。
+线上地址：<https://poundlock.irmox.com/>（英文页在 [`/en/`](https://poundlock.irmox.com/en/)）。原来的地址 `https://poundlock.github.io/poundlock-site/` 现在是跳到这里的跳转页。
 
 poundlock 是一个 Claude Code 插件：十个角色的软件开发团队，按顺序把你的需求做完，每一步做没做完由门禁核。这个仓库只是它的官网；插件本身、怎么安装、怎么用，见插件仓库的 README。
 

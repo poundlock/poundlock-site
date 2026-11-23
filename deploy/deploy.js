@@ -1,4 +1,5 @@
-// 部署到 GitHub Pages。由 `wellyard deploy site --to pages` 调，不要直接跑（直接跑不弹窗确认、不记部署 tag）。
+// 部署整个官网到 GitHub Pages（推 gh-pages）。2026-11-23 起正式地址在服务器上（deploy/server.js），
+// Pages 那个旧地址改放跳转页（deploy/redirect.js 复用这里推 gh-pages 的那段）；这个脚本留着，Pages 要再放整站时用。
 //
 // 做的事：把页面生成到系统临时目录下的一个新目录，在那里建一个只有一次提交的临时仓库，
 // 强推到官网仓库 origin 的 gh-pages 分支，再把临时目录删掉。gh-pages 上从来只有最新这一次提交：
@@ -32,13 +33,19 @@ export function planDeploy(env) {
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim();
 
-// 生成、建临时仓库、强推到 origin 的 plan.branch。origin 是一个 git 地址（测试里是本机的一个空仓库）。
-export async function deploy({ plan, origin, log = console.log }) {
+// 默认的生成步骤：按 plan.siteUrl 生成整个官网
+export async function buildSite(dir, plan, log) {
+  const { build } = await import('../build.js');
+  const { pages } = await build({ outDir: dir, siteUrl: plan.siteUrl, version: plan.version, commit: plan.commit });
+  log(`已生成 ${pages.length} 页。`);
+}
+
+// 生成（generate 往 dir 里写要上线的文件，默认是整个官网；deploy/redirect.js 换成跳转页）、建临时仓库、
+// 强推到 origin 的 plan.branch。origin 是一个 git 地址（测试里是本机的一个空仓库）。
+export async function deploy({ plan, origin, log = console.log, generate = buildSite }) {
   const dir = mkdtempSync(path.join(tmpdir(), 'poundlock-site-deploy-'));
   try {
-    const { build } = await import('../build.js');
-    const { pages } = await build({ outDir: dir, siteUrl: plan.siteUrl, version: plan.version, commit: plan.commit });
-    log(`已生成 ${pages.length} 页。`);
+    await generate(dir, plan, log);
     git(dir, 'init', '--quiet', '--initial-branch', plan.branch);
     // 这是个刚建的、只装着生成结果的临时仓库，里面的东西全都要上线。
     git(dir, 'add', '--all');
