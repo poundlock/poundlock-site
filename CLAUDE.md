@@ -45,7 +45,7 @@ poundlock 的宣传官网：一页落地页，中英双语。为什么长这样�
   - 900 以下单栏：终端按 4:3，左右对齐页边距。
   - 680 以下：演示换成手机那一版（宽 358，高按那块地方的长宽比）。
 - **退路**：省流量模式不下演示；样式、脚本取不到或者挂的时候出错（文案不全也算），退回图标的三片；入口脚本整个没取到时也是三片。挂演示不阻塞别的模块（`main.js` 的 `mountDemo` 不等）。
-- **核对**：`browser-check.js` 的 `hero-demo`（挂上前后版式不动、左右对齐内容区、首屏放得下、不横向溢出）、`hero-demo-fallback`、`hero-demo-savedata`。
+- **核对**：`browser-check.js` 的 `hero-demo`（挂上前后版式不动、左右对齐内容区、首屏放得下、不横向溢出）、`hero-demo-keycap`（回车的键帽落在输入框里面：它的位置是量出来写死在 `tools/stage/hero/hero.css` 里的，改了终端的内边距要重新量）、`hero-demo-fallback`、`hero-demo-savedata`。
 
 ## 影片（「过闸」那一节的画面）
 

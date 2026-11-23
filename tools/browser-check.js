@@ -1098,6 +1098,27 @@ export const CHECKS = [
     },
   },
   {
+    // 回车的键帽亮起来时整个落在输入框里面，不压在边框上（它的位置是量出来写死的，改了终端的内边距会走样）。
+    name: 'hero-demo-keycap',
+    engines: ['chromium'],
+    viewports: ['1440', '360'],
+    langs: ['zh'],
+    async run({ page, url }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('.ss-keys[data-show="true"]', { timeout: 30000 });
+      await page.waitForTimeout(150);
+      const m = await page.evaluate(() => {
+        const box = (el) => {
+          const r = el.getBoundingClientRect();
+          return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+        };
+        return { key: box(document.querySelector('.ss-keys[data-show="true"] .ss-key')), input: box(document.querySelector('.ph-input')) };
+      });
+      const inside = m.key.left > m.input.left && m.key.right <= m.input.right - 2 && m.key.top >= m.input.top + 2 && m.key.bottom <= m.input.bottom - 2;
+      expect(inside, `键帽 ${JSON.stringify(m.key)} 没有整个落在输入框 ${JSON.stringify(m.input)} 里面`);
+    },
+  },
+  {
     // 演示的脚本取不到：退回图标的三片，不抛错，首屏照常。
     name: 'hero-demo-fallback',
     viewports: ['1440', '360'],

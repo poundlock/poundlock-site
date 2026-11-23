@@ -289,16 +289,17 @@
     background: var(--ph-bright);
   }
 
-  /* 键帽：在输入框里面的右端（输入框右边到舞台边是终端的内边距 24，键帽再往里 8；竖着和输入框居中），
-     用终端抬高一级的面，不用中性的炭灰 */
+  /* 键帽：在输入框里面的右端，竖着居中、离右边框留出和上下一样的空。用终端抬高一级的面，不用中性的炭灰。
+     量出来的数（设计像素）：宽版输入框离舞台右边 40、下边 38、高 41（窗口内容区自带一圈 16 的边距，加上终端的内边距），
+     键帽 28 见方，所以右 46.5、下 44.5；手机版输入框离右边、下边各 30、高 33，所以右、下各 32.5。改了内边距要重新量 */
   & .ss-keys[data-at="bottom-right"] {
-    right: 32px;
-    bottom: 28px;
+    right: 46.5px;
+    bottom: 44.5px;
   }
 
   & .ss-stage[data-layout="compact"] .ss-keys[data-at="bottom-right"] {
-    right: 20px;
-    bottom: 16px;
+    right: 32.5px;
+    bottom: 32.5px;
   }
 
   & .ss-key {
