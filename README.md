@@ -26,6 +26,7 @@ node tools/serve.js    # 在本机起一个静态服务，打开它打印的地�
 | `src/scripts/` | 浏览器里跑的脚本。页面不靠它们也读得通，它们只做增强 |
 | `src/assets/film/` | 「过闸」那一节的影片：离线渲染的一串画面，页面按滚动位置换帧 |
 | `tools/film/` | 渲染那段影片的 Blender 脚本和压片脚本 |
+| `tools/stage/` | 首屏那个终端演示的源码（React，打包好的放在 `src/assets/stage/`） |
 | `tools/browser-check.js` | 在三个浏览器内核里把生成出来的页面真的打开核一遍 |
 | `docs/visual-direction.md` | 为什么长这样：配色、字体、过闸怎么演 |
 
@@ -51,4 +52,4 @@ npx playwright install chromium webkit firefox
 
 ## 许可
 
-仓库里自带的第三方文件各有各的许可，许可文件跟着它们一起放：anime.js（MIT，`src/vendor/animejs/`）、IBM Plex（SIL Open Font License，`src/assets/fonts/`）。
+仓库里自带的第三方文件各有各的许可，许可文件跟着它们一起放：anime.js（MIT，`src/vendor/animejs/`）、IBM Plex（SIL Open Font License，`src/assets/fonts/`）、Stageshow 的部件（MIT，`tools/stage/kit/`）。首屏演示打包好的文件里还有 React（MIT），它的许可证注释留在文件末尾。

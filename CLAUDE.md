@@ -13,6 +13,7 @@ poundlock 的宣传官网：一页落地页，中英双语。为什么长这样�
   - 浏览器核对要 Playwright：`npm install --no-save playwright@1.65.1`，再 `npx playwright install chromium webkit firefox`。
   - 重新裁字体要 Python 的 `fonttools` 和 `brotli`（`tools/subset-fonts.py` 开头写了原始字体从哪几个包里取）。
   - 重新渲染过闸的影片要 Blender 5.3 和带 libwebp 的 ffmpeg，见下面「影片」。
+  - 改首屏演示要在 `tools/stage/` 下 `npm ci`（它自己的 `package.json`：React、esbuild），见下面「首屏演示」。
 
 ## 构建
 
@@ -27,8 +28,23 @@ poundlock 的宣传官网：一页落地页，中英双语。为什么长这样�
   - 页面上的数字和命令对着插件仓库核（`../plugin/` 在本机时才核，不在就跳过）。
   - 颜色只能出自 `src/styles/tokens.css` 的调色板，正文对比度要到 AA。
   - 中文字体是按文案裁的子集：文案里出现子集没有的字，测试会红，这时重跑 `python tools/subset-fonts.py <原始字体目录>`。
-- `node tools/browser-check.js --engines chromium,webkit,firefox`：在三个浏览器内核里把生成出来的页面真的打开核一遍（三种宽度、两种语言），全跑要十几分钟。`--only 名字,名字` 只跑其中几条。
+- `node tools/browser-check.js --engines chromium,webkit,firefox`：在三个浏览器内核里把生成出来的页面真的打开核一遍（三种宽度、两种语言），全跑要十几分钟。`--only 名字,名字` 只跑其中几条。另有两个只给点了名的核对用的视口 `tall`（1600×1250）、`tall-narrow`（980×1200），都是首屏的高屏版式，在 `EXTRA_VIEWPORTS` 里。
 - 主仓库清单里这个组件的 `test` 是 `node --test`，`wellyard test site` 跑的就是它。浏览器核对不在里面（要另装 Playwright、慢），改了页面自己跑。
+
+## 首屏演示
+
+首屏右边（高屏是下面）那个终端：一个 Claude Code 会话里跑完一趟 `/poundlock:at`，项目经理亮需求稿、八段往前走、门禁拦下一次越界的写入、业务验收通过，循环放。React 写的，用了 Stageshow 的几个部件，事先打包好放进仓库；官网本身的构建不跑这一步。
+
+- **源码**：`tools/stage/`。`hero/` 是演示本身（组件、样式、`REHEARSAL.md` 是当初排练和复查的记录），`kit/` 是从 Stageshow 拷来的部件，**只拷了用到的那些**（MIT，`kit/LICENSE`，版权人 Benji Taylor；打包出来的两个文件开头带着这行声明）。别把整套部件拷进来：整套的样式会一起打进去，盖掉演示自己的样式。`entry.tsx` 是挂到页面上的入口，`size.js` 定舞台的设计尺寸。
+- **打包**：`cd tools/stage && npm ci && npm run build`，输出 `src/assets/stage/hero-demo.js`（连 React 一起，压缩前 190 KB 上下）和 `hero-demo.css`，这两个进仓库。改了 `tools/stage/` 下的任何东西都要重新打包再提交。样式里的嵌套写法打包时降成平的（`build.mjs` 的 `target`），老 Safari 不认嵌套。
+- **文案**：`src/copy/hero-demo.json`，中英两页用同一份（插件本身是中文的）。构建时写进演示那个位置的 `data-demo-copy`，入口从那里读；**别用 `data-copy` 这个名字**，那是复制按钮的钩子。八段的名字、谁干，和 `zh.json`、`facts.js` 对着核（`tests/hero-demo.test.js`）；中文字体的子集也按它裁（`tools/subset-fonts.py`）。
+- **版式**：留给演示的那块地方多大由 `src/styles/sections/hero.css` 定，演示按它的长宽比定设计尺寸（`size.js`：字放大到 1.45 倍为止，多出来的地方让终端变宽、变高）。那块地方标了 `contain: size`，不能被演示的内容反过来撑大。四种：
+  - 宽屏：左字右终端，终端从右栏一直铺到屏幕右边出画；高是宽的 0.9 倍，但不超过首屏剩下的高度（超了就排扁一点），整个终端连输入框都在首屏里。不到 1280 宽时右栏多给一些，免得那块地方窄于 600、演示换成手机那一版。
+  - 高屏（宽高比不到 3:2、又至少 1000 高）：左右排会上下各空出几百像素，改成上下排。上面一条标题在左、副标题和按钮在右边和它底边对齐；下面整条给终端，占满首屏剩下的高度。终端的左边要落在标题那条左边线上：舞台里窗口左边有 40 的边距，放大 1.45 倍是 58px，往外挪掉（窗口不到 1000 宽或者特别宽时倍数不是 1.45，公式在 `hero.css` 的注释里）。
+  - 900 以下单栏：终端按 4:3，左边按缩放算着往外挪（公式在 `hero.css` 的注释里）。
+  - 640 以下：演示换成手机那一版（358×372）。
+- **退路**：省流量模式不下演示；样式、脚本取不到或者挂的时候出错（文案不全也算），退回图标的三片；入口脚本整个没取到时也是三片。挂演示不阻塞别的模块（`main.js` 的 `mountDemo` 不等）。
+- **核对**：`browser-check.js` 的 `hero-demo`（挂上前后版式不动、出画、对齐、首屏放得下、不横向溢出）、`hero-demo-fallback`、`hero-demo-savedata`。
 
 ## 影片（「过闸」那一节的画面）
 
@@ -87,6 +103,8 @@ poundlock 的宣传官网：一页落地页，中英双语。为什么长这样�
 - **Node 24.14 的 `node --test` 全量跑偶尔会卡死**，和仓库路径长度有关，是运行器的毛病。先重跑，别急着查代码。
 - **批量改文件别用 heredoc 往命令行里塞带引号的大段内容**（Bash 会解析失败，或者把转义符吃掉）。写成脚本文件再跑。
 - **页面的界面元素不用橙、红、棕**，「没通过」「被拦下」这类状态靠形状和文字区分（虚线、留缺口的圈），不靠红色。影片里的暖光是画面里的光，不算。
+- **有长宽比的网格项默认不横向撑满。** 首屏演示那块地方写了 `aspect-ratio` 和 `max-height`，高度被截住时宽度也跟着缩，终端就够不着屏幕右边、在半空被切断（1920×955 上出过）。所以写明了 `justify-self: stretch`。
+- **布局位移的计数会把演示自己的动画算进去。** 终端往上滚是布局在动，`PerformanceObserver` 的 layout-shift 照记。所以 `hero-demo` 核对不看这个数，改成同一个页面开两次比：一次让演示的脚本一直不回来，一次正常挂上，按不含 transform 的布局位置比。另外英文页 360 宽时，网页字体换上那一下副标题会少一行、按钮上移 30px（位移 0.02），这是字体的事，和演示无关，没处理。
 - **品牌文件没有跟着配色改。** 页面的配色 2026-11-20 换成了「清水」，`src/assets/` 里的图标和分享预览图还是原来的青绿色。那是定了稿的品牌资产，改不改由用户定。
 
 ## 约定

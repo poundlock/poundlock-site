@@ -13,6 +13,7 @@ Thumbs.db
 # 生成结果与本机工具
 /dist/
 /node_modules/
+/tools/stage/node_modules/
 /.shots/
 
 # Blender 脚本跑出来的缓存

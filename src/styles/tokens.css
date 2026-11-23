@@ -104,6 +104,8 @@
 
   /* 动效：水慢，闸快 */
   --ease-water: cubic-bezier(0.16, 0.84, 0.3, 1);
+  /* 东西出现的时候：一开始就快、后面慢慢停住 */
+  --ease-arrive: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-gate: cubic-bezier(0.34, 1.4, 0.5, 1);
   --time-water: 900ms;
   --time-gate: 320ms;

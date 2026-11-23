@@ -47,11 +47,14 @@ export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version
   }
 
   const filmManifest = film === undefined ? await loadFilm() : film;
+  // 首屏演示里终端的字：插件本身是中文的，中英两页用同一份
+  const heroDemo = await loadCopy('hero-demo');
   const pages = [];
   for (const lang of config.langs) {
     const ctx = {
       lang,
       t: await loadCopy(lang.code),
+      heroDemo,
       base: lang.path ? '../'.repeat(lang.path.split('/').filter(Boolean).length) : '',
       config: { ...config, siteUrl },
       version,

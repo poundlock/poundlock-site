@@ -20,6 +20,14 @@ export const VIEWPORTS = [
   { name: '1440', width: 1440, height: 900 },
 ];
 
+// 只给点了名的核对用的视口（不进默认那三种，免得全跑再慢三分之一）：
+// tall 是偏方又够高的窗口，首屏换成上下排的那一版（hero.css 的高屏版式）；tall-narrow 是同一版式里
+// 不到 1000 宽的窗口，演示放大不到 1.45 倍，终端往外挪的距离走另一条公式。
+export const EXTRA_VIEWPORTS = [
+  { name: 'tall', width: 1600, height: 1250 },
+  { name: 'tall-narrow', width: 980, height: 1200 },
+];
+
 export const LANGS = [
   { code: 'zh', path: '' },
   { code: 'en', path: 'en/' },
@@ -454,8 +462,11 @@ export const CHECKS = [
         const index = await (await fetch(`${film.base}${film.tiers[canvas.dataset.filmSet].dir}/index.json`)).json();
         return index.segments.length;
       });
-      await page.waitForFunction((want) => performance.getEntriesByType('resource').filter((e) => e.name.endsWith('.bin')).length >= want, segments * 2, { timeout: 30000 }).catch(() => {});
-      const whole = new Set(files.filter((f) => !f.range).map((f) => f.name));
+      // 直接等整段下的文件凑够。原来等的是「下完的 .bin 至少 段数 × 2 个」，那里面含着首屏时带 Range 的那一次，
+      // 差一个就开始数，偶尔数到 19 个就判不过。
+      const wholeFiles = () => new Set(files.filter((f) => !f.range).map((f) => f.name));
+      for (let waited = 0; wholeFiles().size < segments * 2 && waited < 30000; waited += 250) await page.waitForTimeout(250);
+      const whole = wholeFiles();
       expect(whole.size === segments * 2, `滚进过闸以后，${segments} 段应当各下关键帧和其余帧两个文件，实际下了 ${whole.size} 个`);
     },
   },
@@ -1002,6 +1013,119 @@ export const CHECKS = [
     },
   },
   {
+    // 首屏演示（tools/stage 打包的 React 终端）：挂得上、挂上时版式不跳、终端从屏幕右边出画、
+    // 左边对齐标题那条线（单栏和高屏版式）、宽屏和高屏版式里整个终端都在首屏以内、不横向溢出、字是 hero-demo.json 里的。
+    name: 'hero-demo',
+    viewports: ['360', '820', '1440', 'tall', 'tall-narrow'],
+    async run({ page, context, url, viewport, shot }) {
+      const demo = JSON.parse(await readFile(path.join(ROOT, 'src', 'copy', 'hero-demo.json'), 'utf8'));
+      // 版式不跳：同一个页面开两次比。一次让演示的脚本一直不回来（只有样式里留好的位置），一次正常挂上。
+      // 按布局位置比（offsetTop 一路加上去），不算 transform：挂上之前演示带着入场的 translateY(12px)。
+      // 都等网页字体换好再量：英文页 360 宽时字体换上那一下副标题少一行，那是另一回事，原来就有。
+      const layout = (target) =>
+        target.evaluate(async () => {
+          await document.fonts.ready;
+          return ['.hero__copy', '.hero__demo', '#pain'].map((sel) => {
+            const el = document.querySelector(sel);
+            let top = 0;
+            let left = 0;
+            for (let node = el; node; node = node.offsetParent) {
+              top += node.offsetTop;
+              left += node.offsetLeft;
+            }
+            return [sel, left, top, el.offsetWidth, el.offsetHeight];
+          });
+        });
+      const reserved = await context.newPage();
+      await reserved.route('**/stage/hero-demo.js', () => {});
+      await reserved.goto(url, { waitUntil: 'domcontentloaded' });
+      await reserved.waitForTimeout(800);
+      const before = await layout(reserved);
+      await reserved.close();
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('[data-hero-demo][data-ready]', { timeout: 10000 });
+      await page.waitForTimeout(700);
+      const after = await layout(page);
+      expect(JSON.stringify(before) === JSON.stringify(after), `演示挂上前后版式变了：${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+      const m = await page.evaluate(() => {
+        const box = (sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+        };
+        return {
+          noDemo: document.querySelector('.hero').classList.contains('hero--no-demo'),
+          markShown: getComputedStyle(document.querySelector('.hero__mark')).display !== 'none',
+          title: box('.hero__title'),
+          copy: box('.hero__copy'),
+          win: box('.ph-win'),
+          text: document.querySelector('.ph-term')?.textContent ?? '',
+          layout: document.querySelector('.ss-stage')?.dataset.layout,
+          vw: document.documentElement.clientWidth,
+          vh: innerHeight,
+          scrollWidth: document.documentElement.scrollWidth,
+        };
+      });
+      expect(!m.noDemo && m.win, '演示没挂上（hero 上标了 hero--no-demo，或者找不到终端窗口）');
+      expect(!m.markShown, '演示挂上了，图标的三片还显示着');
+      expect(m.text.includes(demo.allDone), `终端里没有「${demo.allDone}」，文案不是从 hero-demo.json 来的？`);
+      expect(m.win.right > m.vw, `终端的右边在 ${Math.round(m.win.right)}，没有跑出屏幕右边（${m.vw}），在半空被切断了`);
+      expect(m.scrollWidth <= m.vw + 1, `横向溢出：scrollWidth ${m.scrollWidth} > ${m.vw}`);
+      const split = viewport.name === '1440';
+      if (split) {
+        expect(m.win.left >= m.copy.right, `宽屏版式里终端（左边 ${Math.round(m.win.left)}）压到了左边的字上（${Math.round(m.copy.right)}）`);
+      } else {
+        expect(Math.abs(m.win.left - m.title.left) <= 2, `终端的左边 ${Math.round(m.win.left)} 没对齐标题的左边 ${Math.round(m.title.left)}`);
+      }
+      if (split || viewport.name.startsWith('tall')) {
+        expect(m.win.bottom <= m.vh, `终端的底边在 ${Math.round(m.win.bottom)}，超出了首屏（${m.vh}），输入框被挤到了首屏外面`);
+        expect(m.layout === 'wide', `宽屏、高屏版式里演示用的是 ${m.layout} 那一版`);
+      }
+      await shot('hero');
+    },
+  },
+  {
+    // 演示的脚本取不到：退回图标的三片，不抛错，首屏照常。
+    name: 'hero-demo-fallback',
+    viewports: ['1440', '360'],
+    async setup({ context }) {
+      await context.route('**/stage/hero-demo.js', (route) => route.abort());
+    },
+    async run({ page, url, uncaught }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForFunction(() => document.querySelector('.hero').classList.contains('hero--no-demo'), null, { timeout: 8000 });
+      const shown = await page.evaluate(() => getComputedStyle(document.querySelector('.hero__mark')).display !== 'none');
+      expect(shown, '演示的脚本取不到，图标的三片也没显示');
+      expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
+    },
+  },
+  {
+    // 省流量模式：不下演示（连样式也不取），首屏是图标的三片。
+    name: 'hero-demo-savedata',
+    viewports: ['360'],
+    engines: ['chromium'],
+    async setup({ context }) {
+      await context.addInitScript(() => {
+        Object.defineProperty(navigator, 'connection', { configurable: true, value: { saveData: true } });
+      });
+    },
+    async run({ page, url }) {
+      const asked = [];
+      page.on('request', (request) => {
+        if (request.url().includes('/stage/hero-demo')) asked.push(request.url());
+      });
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForTimeout(1200);
+      const state = await page.evaluate(() => ({
+        noDemo: document.querySelector('.hero').classList.contains('hero--no-demo'),
+        shown: getComputedStyle(document.querySelector('.hero__mark')).display !== 'none',
+      }));
+      expect(state.noDemo && state.shown, '省流量模式下首屏没有退回图标的三片');
+      expect(asked.length === 0, `省流量模式下还是取了演示：${asked.join(' | ')}`);
+    },
+  },
+  {
     name: 'shots',
     async run({ page, url, shot }) {
       await page.goto(url, { waitUntil: 'load' });
@@ -1242,8 +1366,8 @@ async function main() {
           const own = check.launch ? await playwright[engine].launch(check.launch) : null;
           for (const lang of LANGS) {
             if (check.langs && !check.langs.includes(lang.code)) continue;
-            for (const viewport of VIEWPORTS) {
-              if (check.viewports && !check.viewports.includes(viewport.name)) continue;
+            for (const viewport of [...VIEWPORTS, ...EXTRA_VIEWPORTS]) {
+              if (check.viewports ? !check.viewports.includes(viewport.name) : EXTRA_VIEWPORTS.includes(viewport)) continue;
               results.push(await runCheck(own ?? browser, engine, check, lang, viewport, baseUrl, outDir, copy));
             }
           }

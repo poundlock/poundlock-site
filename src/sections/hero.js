@@ -23,8 +23,8 @@ function titleLines(text) {
 }
 
 export function render(ctx) {
-  const { t, config } = ctx;
-  return html`<section id="hero" class="hero" data-section="hero" data-zone="deep">
+  const { t, config, heroDemo } = ctx;
+  return html`<section id="hero" class="${heroDemo ? 'hero' : 'hero hero--no-demo'}" data-section="hero" data-zone="deep">
   <canvas class="hero__water" data-water aria-hidden="true"></canvas>
   <div class="hero__copy">
     <h1 class="hero__title">${titleLines(t.hero.h1)}</h1>
@@ -36,5 +36,8 @@ export function render(ctx) {
     </div>
   </div>
   <div class="hero__mark" aria-hidden="true">${mark}</div>
+  <!-- 首屏演示：一个 Claude Code 会话里跑完一趟（tools/stage/ 里的 React 演示，事先打包好）。脚本挂上以后替掉上面的三片。
+       终端里的字从 data-demo-copy 传进去（src/copy/hero-demo.json）；没有这份文案就不放这个位置，页面一直是三片。 -->
+  ${heroDemo ? html`<div class="hero__demo" data-hero-demo data-demo-copy="${JSON.stringify(heroDemo)}" aria-hidden="true"></div>` : null}
 </section>`;
 }

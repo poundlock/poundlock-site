@@ -118,9 +118,10 @@ test('对比度到 AA', () => {
 
 test('中文字体的子集盖得住文案里的每个字', () => {
   const chars = new Set(readFileSync(path.join(ROOT, 'src', 'assets', 'fonts', 'zh-chars.txt'), 'utf8'));
-  const copy = readFileSync(path.join(ROOT, 'src', 'copy', 'zh.json'), 'utf8');
-  const missing = [...new Set(JSON.stringify(Object.values(JSON.parse(copy))))].filter(
-    (ch) => /[⺀-鿿＀-￯　-〿]/.test(ch) && !chars.has(ch),
-  );
+  // 首屏演示里终端的字（hero-demo.json）也用这两款中文字体
+  const text = ['zh.json', 'hero-demo.json']
+    .map((name) => JSON.stringify(Object.values(JSON.parse(readFileSync(path.join(ROOT, 'src', 'copy', name), 'utf8')))))
+    .join('');
+  const missing = [...new Set(text)].filter((ch) => /[⺀-鿿＀-￯　-〿]/.test(ch) && !chars.has(ch));
   assert.deepEqual(missing, [], `这些字不在子集里，要重新裁字体：${missing.join('')}`);
 });

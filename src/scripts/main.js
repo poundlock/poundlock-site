@@ -80,6 +80,32 @@ function reanchor() {
   if (target) target.scrollIntoView({ block: 'start' });
 }
 
+// 首屏演示：打包好的 React 演示（tools/stage），挂上以后替掉图标的三片。减少动效时演示自己停在最后那一帧。
+// 省流量模式不下；样式、脚本取不到或者挂的时候出错（文案不全也算），退回图标。
+async function mountDemo() {
+  try {
+    const slot = document.querySelector('[data-hero-demo]');
+    if (!slot) return;
+    if (navigator.connection && navigator.connection.saveData) {
+      slot.closest('.hero').classList.add('hero--no-demo');
+      return;
+    }
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = new URL('../stage/hero-demo.css', import.meta.url).href;
+    document.head.append(link);
+    await new Promise((resolve) => {
+      link.onload = resolve;
+      link.onerror = resolve;
+    });
+    const { mountHeroDemo } = await import('../stage/hero-demo.js');
+    mountHeroDemo(slot);
+  } catch (error) {
+    document.querySelector('.hero')?.classList.add('hero--no-demo');
+    console.warn('[poundlock] 首屏演示没起来，退回图标。', error);
+  }
+}
+
 async function boot() {
   // 水面不靠动效库。
   try {
@@ -91,6 +117,9 @@ async function boot() {
   } catch (error) {
     console.warn('[poundlock] 水面没起来，用静态的底。', error);
   }
+
+  // 首屏演示和下面那些各管各的：不等它下完再起别的（它的位置样式里已经留好，挂上时版式不跳）。
+  mountDemo();
 
   let anime = null;
   if (!reduced) {

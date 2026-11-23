@@ -1,0 +1,359 @@
+/* poundlock 首屏演示。全部挂在 .ph 下面。
+   底：官网首屏是深蓝的水面，演示直接压在上面（页面就是底，不垫板子）。这里给预览页配同一个渐变，
+   嵌进官网时设 --ph-ground: transparent。 */
+
+.ph {
+  & .ss-stage {
+    overflow: hidden;
+    background: var(--ph-ground, linear-gradient(140deg, #0b6088, #041b33 78%));
+    --ss-mono: var(--ph-mono, "Cascadia Mono", Consolas, ui-monospace, "Microsoft YaHei", monospace);
+    --ph-bright: #ecf7fd;
+    --ph-text: #a9c4d4;
+    --ph-faint: #5f7d91;
+    --ph-accent: #7fe3ff;
+  }
+
+  /* 终端：比水面暗一级的实心面，一道细亮边；上、左、下各留一道边距，往右跑出画面 80px（右边只有空的终端）。
+     舞台的设计尺寸由官网按留给它的地方定（不一定是 720 × 540），所以右边按舞台边算，不写死宽度。 */
+  & .ph-win {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    bottom: 40px;
+    right: -80px;
+    --ss-term-bg: #071b2e;
+    --ss-term-dim: var(--ph-faint);
+    /* 不是一整块平的暗色：光从左上来（和首屏水面的光同一个方向），面上左上亮一点、往右下沉下去，
+       顶边一道细高光。都是静止的渐变，不跟着水面每帧重画。 */
+    background:
+      radial-gradient(120% 70% at 0% 0%, rgba(127, 227, 255, 0.075), transparent 62%),
+      linear-gradient(168deg, #0a2440 0%, #081f37 38%, #06172a 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(236, 247, 253, 0.12),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+      var(--ss-shadow-hero, var(--ss-shadow-window));
+  }
+
+  /* 往上滚走的旧内容在标题栏底下淡出去，不露半行被切掉的字 */
+  & .ph-win > .ss-window__body {
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, transparent 10px, #000 60px);
+    mask-image: linear-gradient(180deg, transparent 0, transparent 10px, #000 60px);
+  }
+
+  & .ss-stage[data-layout="compact"] .ph-win {
+    left: 16px;
+    top: 16px;
+    bottom: 16px;
+    right: -38px;
+  }
+
+  & .ss-stage[data-layout="compact"] .ph-win > .ss-window__body {
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, transparent 6px, #000 44px);
+    mask-image: linear-gradient(180deg, transparent 0, transparent 6px, #000 44px);
+  }
+
+  /* 内容贴着底部往上长，顶上的旧内容钻到标题栏底下去，和真的终端一样 */
+  & .ph-term {
+    box-sizing: border-box;
+    height: 100%;
+    justify-content: flex-end;
+    gap: 0;
+    /* 右边：窗口往右出画 80px，内容在舞台边以内一道边距（40px）处就止住、折行，出画的只有空的终端 */
+    padding: 6px 160px 22px 24px;
+    color: var(--ph-text);
+    font-size: 15px;
+    line-height: 23px;
+  }
+
+  & .ss-stage[data-layout="compact"] .ph-term {
+    padding: 4px 54px 14px 14px;
+    font-size: 12.5px;
+    line-height: 19px;
+  }
+
+  /* 记录往上滚的时候靠布局在动：给每一趟一层固定的合成层，字不在像素之间跳 */
+  & .ph-run {
+    will-change: transform;
+  }
+
+  & .ph-term b {
+    color: var(--ph-bright);
+    font-weight: 600;
+  }
+
+  & .ph-faint {
+    color: var(--ph-faint);
+  }
+
+  /* 你说的那句：和 Claude Code 一样垫一条浅底 */
+  & .ph-user {
+    display: flex;
+    gap: 1ch;
+    margin-top: 20px;
+    padding: 3px 12px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--ph-bright);
+    white-space: pre;
+  }
+
+  & .ss-stage[data-layout="compact"] .ph-user {
+    margin-top: 16px;
+    padding: 2px 10px;
+  }
+
+  & .ph-user__sigil,
+  & .ph-input__sigil {
+    color: var(--ph-faint);
+  }
+
+  /* 一条消息：圆点占一格，正文从第三格起；换行时悬挂缩进 */
+  & .ph-line {
+    display: grid;
+    grid-template-columns: 2ch minmax(0, 1fr);
+    padding-top: 11px;
+    white-space: normal;
+  }
+
+  & .ss-stage[data-layout="compact"] .ph-line {
+    padding-top: 8px;
+  }
+
+  & .ph-line__dot {
+    color: var(--ph-bright);
+  }
+
+  /* 工具调用的结果：└ 接在上一条下面 */
+  & .ph-result {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    column-gap: 10px;
+    align-items: baseline;
+    padding-top: 3px;
+    padding-left: 2ch;
+    white-space: normal;
+  }
+
+  & .ph-result__hook {
+    color: var(--ph-faint);
+  }
+
+  /* 门禁：白底反白的一块，全屏最重的一笔；不用红色（官网的规矩），也不和青色的「通过」同色 */
+  & .ph-gate {
+    padding: 0 0.55ch;
+    border-radius: 3px;
+    background: var(--ph-bright);
+    color: #04223a;
+    font-weight: 700;
+  }
+
+  & .ph-result__text {
+    color: var(--ph-bright);
+    text-wrap: balance;
+  }
+
+  & .ph-ok {
+    color: var(--ph-accent);
+    font-weight: 600;
+  }
+
+  /* 需求稿：Claude Code 问你选哪一项的那个面板 */
+  & .ph-ask {
+    margin-top: 11px;
+    padding: 11px 16px 13px;
+    border: 1px solid color-mix(in srgb, var(--ph-accent) 38%, transparent);
+    border-radius: 6px;
+    white-space: normal;
+  }
+
+  & .ss-stage[data-layout="compact"] .ph-ask {
+    margin-top: 8px;
+    padding: 8px 12px 10px;
+  }
+
+  & .ph-ask__head {
+    color: var(--ph-bright);
+    font-weight: 600;
+  }
+
+  & .ph-ask__body {
+    margin: 2px 0 8px;
+    text-wrap: balance;
+  }
+
+  & .ph-ask__opt {
+    display: grid;
+    grid-template-columns: 2ch minmax(0, 1fr);
+    color: var(--ph-faint);
+  }
+
+  & .ph-ask__opt[data-on] {
+    color: var(--ph-accent);
+  }
+
+  /* 进度：正在跑的那一段和谁在干，后面八格；走完的格子是次一级的墨色，正在跑的那一格是青色 */
+  & .ph-status {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding-top: 14px;
+    color: var(--ph-faint);
+    white-space: pre;
+  }
+
+  & .ss-stage[data-layout="compact"] .ph-status {
+    padding-top: 10px;
+  }
+
+  & .ph-status__mark {
+    flex: none;
+    width: 1.6em;
+  }
+
+  /* 各个字形宽窄不一：给它一个固定的格子，换字形时旁边的字不动 */
+  & .ph-spin {
+    display: inline-block;
+    width: 1.2em;
+    color: var(--ph-accent);
+    text-align: center;
+  }
+
+  /* Claude Code 干活时那颗一直在变的星：同一格里一个个换字形，不转圈 */
+  & .ph-spin::before {
+    content: "✻";
+    animation: ph-spin 1.2s steps(1) infinite;
+  }
+
+  & .ph-tick {
+    color: var(--ph-text);
+  }
+
+  & .ph-status__label {
+    color: var(--ph-bright);
+    font-weight: 600;
+  }
+
+  & .ph-status[data-all] .ph-status__label {
+    color: var(--ph-text);
+    font-weight: 400;
+  }
+
+  & .ph-status__who {
+    margin-left: 1.5ch;
+    color: var(--ph-faint);
+  }
+
+  & .ph-meter {
+    display: flex;
+    flex: none;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  & .ph-meter i {
+    width: 14px;
+    height: 6px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    transition: background-color 0.2s ease;
+  }
+
+  & .ss-stage[data-layout="compact"] .ph-meter {
+    gap: 3px;
+  }
+
+  & .ss-stage[data-layout="compact"] .ph-meter i {
+    width: 9px;
+    height: 5px;
+  }
+
+  & .ph-meter i[data-state="done"] {
+    background: var(--ph-text);
+  }
+
+  & .ph-meter i[data-state="run"] {
+    background: var(--ph-accent);
+  }
+
+  /* 输入框：圆角细框 */
+  & .ph-input {
+    display: flex;
+    gap: 1ch;
+    align-items: center;
+    margin-top: 14px;
+    padding: 8px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    color: var(--ph-bright);
+    white-space: pre;
+  }
+
+  & .ss-stage[data-layout="compact"] .ph-input {
+    margin-top: 10px;
+    padding: 6px 12px;
+  }
+
+  & .ph-caret {
+    margin-left: 0;
+    background: var(--ph-bright);
+  }
+
+  /* 键帽：离舞台边一道边距，用终端抬高一级的面，不用中性的炭灰 */
+  & .ss-keys[data-at="bottom-right"] {
+    right: 64px;
+    bottom: 64px;
+  }
+
+  & .ss-stage[data-layout="compact"] .ss-keys[data-at="bottom-right"] {
+    right: 30px;
+    bottom: 30px;
+  }
+
+  & .ss-key {
+    background: #123653;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 -2px 0 rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.25);
+    color: var(--ph-bright);
+  }
+}
+
+@keyframes ph-spin {
+  0% { content: "✻"; }
+  17% { content: "✽"; }
+  33% { content: "✶"; }
+  50% { content: "✳"; }
+  67% { content: "✢"; }
+  83% { content: "·"; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ph .ph-spin::before {
+    animation: none;
+  }
+}
+
+/* 终端输出一条条出来：套件的展开是给网页卡片调的（420–460ms、柔和曲线），对一个终端偏慢偏软。
+   真的终端里输出是一下子出来的；讲故事可以比它慢，但不慢到像网页卡片：收到 260ms 上下、一开始就快的减速曲线。
+   只改快慢，不改它怎么展开（内容先暗、高度合拢、落下来那一套照旧）。 */
+.ph .ph-term {
+  & .ss-collapse {
+    transition:
+      grid-template-rows 0.26s cubic-bezier(0.23, 1, 0.32, 1) 0.03s,
+      opacity 0.26s cubic-bezier(0, 0.8, 0.5, 1);
+  }
+
+  & .ss-collapse[data-open] {
+    transition:
+      grid-template-rows 0.26s cubic-bezier(0.23, 1, 0.32, 1),
+      opacity 0.16s ease-out 0.08s;
+  }
+
+  & .ss-collapse[data-reveal="drop"][data-open] {
+    transition:
+      grid-template-rows 0.3s cubic-bezier(0.23, 1, 0.32, 1),
+      opacity 0.2s ease 0.12s;
+  }
+
+  & .ss-collapse[data-reveal="drop"][data-open] > .ss-collapse__inner > .ss-collapse__glide {
+    transition: transform 0.36s cubic-bezier(0.23, 1, 0.32, 1) 0.1s;
+  }
+}

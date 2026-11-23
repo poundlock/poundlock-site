@@ -1,0 +1,39 @@
+{
+  "title": "shop — claude",
+  "draftLabel": "需求稿",
+  "approve": "照这份需求开始",
+  "revise": "再改改",
+  "answered": "需求稿",
+  "gate": "门禁",
+  "verdictWho": "业务验收",
+  "verdict": "结论：通过",
+  "allDone": "八段全部走完",
+  "reqs": [
+    {
+      "command": "/poundlock:at 给订单列表加导出 CSV",
+      "draft": "订单列表加「导出 CSV」按钮，导出当前筛选结果",
+      "writer": "后端",
+      "owner": "前端",
+      "file": "web/src/OrderList.tsx",
+      "gateSays": "后端不得写这个文件：这条路径不是它认领的。"
+    },
+    {
+      "command": "/poundlock:at 退款单加一个备注字段",
+      "draft": "退款单加「备注」，客服填写，退款记录里看得到",
+      "writer": "前端",
+      "owner": "后端",
+      "file": "server/refund/model.ts",
+      "gateSays": "前端不得写这个文件：这条路径不是它认领的。"
+    }
+  ],
+  "stages": [
+    { "id": "S1", "name": "契约", "who": "项目经理" },
+    { "id": "S2", "name": "产品设计", "who": "产品、UI" },
+    { "id": "S3", "name": "技术方案", "who": "架构师" },
+    { "id": "S4", "name": "派发裁决", "who": "项目经理" },
+    { "id": "S5", "name": "实现", "who": "前端、后端" },
+    { "id": "S6", "name": "测试", "who": "测试角色" },
+    { "id": "S7", "name": "业务验收", "who": "验收角色" },
+    { "id": "S8", "name": "交付", "who": "项目经理" }
+  ]
+}

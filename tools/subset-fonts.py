@@ -8,7 +8,7 @@
   @ibm/plex-mono@2.5.0            IBMPlexMono-Regular.woff2
   @ibm/plex-sans-sc@1.1.0         hinted/IBMPlexSansSC-Text.woff2、hinted/IBMPlexSansSC-SemiBold.woff2
 
-中文两款按 src/copy/zh.json 里实际用到的字裁；用到了哪些字写进 src/assets/fonts/zh-chars.txt，
+中文两款按 src/copy/zh.json 和 hero-demo.json（首屏演示）里实际用到的字裁；用到了哪些字写进 src/assets/fonts/zh-chars.txt，
 tests/tokens.test.js 拿它核文案有没有超出子集。文案改了就重新跑一遍这个脚本。
 要 fonttools 和 brotli（pip install fonttools brotli）。
 """
@@ -40,9 +40,16 @@ def strings(value):
             yield from strings(item)
 
 
+# 首屏演示里终端的字（中英两页都是中文）也用这两款字体
+ZH_SOURCES = ("zh.json", "hero-demo.json")
+
+
 def zh_chars():
-    copy = json.loads((ROOT / "src" / "copy" / "zh.json").read_text(encoding="utf-8"))
-    return "".join(sorted({ch for text in strings(copy) for ch in text if ord(ch) > 0x7F}))
+    chars = set()
+    for name in ZH_SOURCES:
+        copy = json.loads((ROOT / "src" / "copy" / name).read_text(encoding="utf-8"))
+        chars |= {ch for text in strings(copy) for ch in text if ord(ch) > 0x7F}
+    return "".join(sorted(chars))
 
 
 def cut(source, target, *, unicodes=None, text=None):
