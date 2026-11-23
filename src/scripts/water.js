@@ -279,9 +279,13 @@ export function mountWater(canvas, { reduced = false, onDegrade } = {}) {
     const s = canvas.width / c.width;
     return [(r.left - c.left) * s, (c.bottom - r.bottom) * s, r.width * s, r.height * s];
   };
+  // 终端（玻璃）和标题在画布里的位置：平时隔 30 帧量一次；窗口一变（拖窗口宽度、转屏、字体换上），
+  // 接下来半秒每帧都量。不然终端已经挪了，它后面那块糊开、压暗的水还留在原地，看着像拖影（用户拖窗口时看到过）。
   let measureIn = 0;
+  let burst = 0;
   const measure = () => {
-    measureIn = 30;
+    measureIn = burst > 0 ? 0 : 30;
+    if (burst > 0) burst--;
     gl.uniform4fv(uGlass, rectIn(hero && hero.querySelector('.hero__demo[data-ready] .ph-win')));
     gl.uniform4fv(uCalm, rectIn(hero && hero.querySelector('.hero__copy')));
   };
@@ -302,8 +306,18 @@ export function mountWater(canvas, { reduced = false, onDegrade } = {}) {
       canvas.width = width;
       canvas.height = height;
       gl.viewport(0, 0, width, height);
+      burst = 30;
+      measureIn = 0;
     }
   };
+  // 终端、标题自己的大小变了（窗口变了、演示挂上、字体换上）也马上重量
+  const watchLayout = typeof win.ResizeObserver === 'function' ? new win.ResizeObserver(() => {
+    burst = 30;
+    measureIn = 0;
+  }) : null;
+  if (watchLayout && hero) {
+    for (const el of [hero.querySelector('.hero__demo'), hero.querySelector('.hero__copy')]) if (el) watchLayout.observe(el);
+  }
 
   const watchdog = createFpsWatchdog({ onDegrade: () => goStatic(true) });
 
@@ -375,6 +389,7 @@ export function mountWater(canvas, { reduced = false, onDegrade } = {}) {
     if (frame) win.cancelAnimationFrame(frame);
     frame = 0;
     if (observer) observer.disconnect();
+    if (watchLayout) watchLayout.disconnect();
     canvas.removeEventListener('webglcontextlost', onLost);
     canvas.ownerDocument.removeEventListener('visibilitychange', onVisibility);
     win.removeEventListener('pointermove', onPointer);

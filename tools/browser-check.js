@@ -21,8 +21,8 @@ export const VIEWPORTS = [
 ];
 
 // 只给点了名的核对用的视口（不进默认那三种，免得全跑再慢三分之一）：
-// tall 是偏方又够高的窗口，首屏换成上下排的那一版（hero.css 的高屏版式）；tall-narrow 是同一版式里
-// 不到 1000 宽的窗口，演示放大不到 1.45 倍，终端往外挪的距离走另一条公式。
+// tall 是偏方又够高的窗口（首屏不撑满一整屏，最高 1120，终端照样在右边）；tall-narrow 是不到 1000 宽的高窗口，
+// 右栏窄于 600，演示换成手机那一版、照样左右排。
 export const EXTRA_VIEWPORTS = [
   { name: 'tall', width: 1600, height: 1250 },
   { name: 'tall-narrow', width: 980, height: 1200 },
@@ -885,16 +885,18 @@ export const CHECKS = [
       expect(Math.abs(m.win.right - m.lineRight) <= 2, `终端的右边 ${Math.round(m.win.right)} 没对齐内容区的右边线 ${Math.round(m.lineRight)}`);
       expect(m.win.right < m.vw, `终端的右边 ${Math.round(m.win.right)} 跑出了屏幕（${m.vw}）`);
       expect(m.scrollWidth <= m.vw + 1, `横向溢出：scrollWidth ${m.scrollWidth} > ${m.vw}`);
-      const split = viewport.name === '1440';
+      // 901 宽起一律左右排（高屏也是，2026-11-23 起）；右栏窄于 600 时演示用手机那一版
+      const split = viewport.width >= 901;
       if (split) {
         expect(m.win.left >= m.copy.right, `宽屏版式里终端（左边 ${Math.round(m.win.left)}）压到了左边的字上（${Math.round(m.copy.right)}）`);
       } else {
         expect(Math.abs(m.win.left - m.lineLeft) <= 2, `终端的左边 ${Math.round(m.win.left)} 没对齐内容区的左边线 ${Math.round(m.lineLeft)}`);
         expect(Math.abs(m.win.left - m.title.left) <= 2, `终端的左边 ${Math.round(m.win.left)} 没对齐标题的左边 ${Math.round(m.title.left)}`);
       }
-      if (split || viewport.name.startsWith('tall')) {
+      if (split) {
         expect(m.win.bottom <= m.vh, `终端的底边在 ${Math.round(m.win.bottom)}，超出了首屏（${m.vh}），输入框被挤到了首屏外面`);
-        expect(m.layout === 'wide', `宽屏、高屏版式里演示用的是 ${m.layout} 那一版`);
+        const want = m.win.right - m.win.left >= 600 ? 'wide' : 'compact';
+        expect(m.layout === want, `终端 ${Math.round(m.win.right - m.win.left)} 宽，演示应当用 ${want} 那一版，用的是 ${m.layout}`);
       }
       await shot('hero');
     },

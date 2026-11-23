@@ -141,9 +141,10 @@
   display: none;
 }
 
-/* 宽屏：左边字、右边终端，终端的右边就是内容区的右边线。终端是方的，但不超出首屏里剩下的高度
+/* 电脑上（901 宽起）一律左边字、右边终端，终端的右边就是内容区的右边线。终端是方的，但不超出首屏里剩下的高度
    （剩下的不够就排扁一些），矮屏上也不会把终端底下的输入框挤出首屏。
-   右栏至少 600 宽（1200 的内容区里右栏 1.12 份是 608）：窄于 600 演示会换成手机那一版。 */
+   右栏 600 宽起演示用宽屏那一版（1200 的内容区里右栏 1.12 份是 608），窄于 600 换成手机那一版。
+   原来窗口偏方又够高时改成上下排（终端整条铺开），用户看了说「PC 端可以做成一直左右布局」「窗口这一整块有点大」，2026-11-23 改回左右排。 */
 .js .hero:not(.hero--no-demo) .hero__demo {
   display: block;
   position: relative;
@@ -154,7 +155,20 @@
   justify-self: stretch;
   aspect-ratio: 1 / 1;
   min-height: 440px;
-  max-height: calc(100svh - 64px - var(--space-6) - var(--space-7));
+  max-height: calc(var(--hero-h) - 64px - var(--space-6) - var(--space-7));
+}
+
+/* 很高的窗口（1878 × 1503 这样的）里首屏不撑满一整屏：左右排时上下会各空出几百像素的水。
+   首屏最高 1120，下一节从底下露出来；终端的上限跟着首屏的高度走。 */
+.hero {
+  --hero-h: 100svh;
+}
+
+@media (min-width: 901px) {
+  .hero {
+    --hero-h: min(100svh, 1120px);
+    min-height: var(--hero-h);
+  }
 }
 
 /* 屏幕不到 1440 宽时内容区窄于 1200，右栏多给一些，免得窄于 600 */
@@ -164,57 +178,11 @@
   }
 }
 
-/* 高屏（窗口偏方，又够高）：左右排的话，上下各空出几百像素。改成上下排：
-   上面一条，标题在左、副标题和按钮在右边和它底边对齐；下面整条给终端，左右对齐内容区，占满首屏剩下的高度。 */
-@media (min-width: 901px) and (max-aspect-ratio: 3 / 2) and (min-height: 1000px) {
+/* 再窄（小笔记本、横过来的平板）右栏再多给；还是窄于 600 时演示自己换成手机那一版，照样左右排 */
+@media (max-width: 1199px) {
   .js .hero:not(.hero--no-demo) {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    align-items: stretch;
-    row-gap: var(--space-7);
-  }
-
-  .js .hero:not(.hero--no-demo) .hero__copy {
-    display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-    grid-template-rows: 1fr repeat(3, auto);
-    column-gap: 64px;
-    align-items: end;
-  }
-
-  /* 左栏是整条宽的 53% 上下，第二行十个字刚好排成一行；右栏的副标题排两行，整栏比标题矮，顶上不冒出来 */
-  .js .hero:not(.hero--no-demo) .hero__title {
-    grid-column: 1;
-    grid-row: 1 / -1;
-    font-size: clamp(2.75rem, 5.25cqi, 4.75rem);
-    line-height: 1.12;
-    letter-spacing: -0.015em;
-  }
-
-  .js .hero:not(.hero--no-demo) .hero__sub {
-    grid-column: 2;
-    grid-row: 2;
-    margin-top: 0;
-    font-size: var(--text-3);
-  }
-
-  .js .hero:not(.hero--no-demo) .hero__note {
-    grid-column: 2;
-    grid-row: 3;
-  }
-
-  .js .hero:not(.hero--no-demo) .hero__cta {
-    grid-column: 2;
-    grid-row: 4;
-    margin-top: var(--space-5);
-  }
-
-  /* 太高的窗口里终端不比宽的 0.9 倍更高（内容区宽 = 屏幕宽减去两边到边线的距离）。
-     1878 × 1503 这样的窗口里不会碰到这个上限，终端正好占满剩下的高度 */
-  .js .hero:not(.hero--no-demo) .hero__demo {
-    aspect-ratio: auto;
-    min-height: 520px;
-    max-height: calc((100vw - 2 * max(var(--page-pad), calc((100vw - var(--page-max)) / 2))) * 0.9);
+    grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+    column-gap: var(--space-5);
   }
 }
 
