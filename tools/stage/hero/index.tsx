@@ -117,20 +117,22 @@ function makeScript(copy: Copy) {
   }
 }
 
-// width、height：宽版的设计尺寸。官网按留给演示的那块地方的长宽比传进来（字的放大倍数保持在一个范围里），
-// 终端跟着变宽、变高；手机那一版固定 358 × 372。
+// width、height：宽版的设计尺寸；compactHeight：手机那一版的设计高（宽固定 358）。官网按留给演示的那块地方的
+// 长宽比传进来（字的放大倍数保持在一个范围里），终端跟着变宽、变高。
 export function PoundlockHero({
   copy,
   className,
   fill = false,
   width = 720,
   height = 540,
+  compactHeight = 372,
 }: {
   copy: Copy
   className?: string
   fill?: boolean
   width?: number
   height?: number
+  compactHeight?: number
 }) {
   // 同一份文案只造一次脚本：脚本换了舞台会从头放
   const script = useMemo(() => makeScript(copy), [copy])
@@ -138,7 +140,7 @@ export function PoundlockHero({
     <Stage<S>
       width={width}
       height={height}
-      compact={{ below: 600, width: 358, height: 372 }}
+      compact={{ below: 600, width: 358, height: compactHeight }}
       theme="dark"
       fill={fill}
       initial={initial}

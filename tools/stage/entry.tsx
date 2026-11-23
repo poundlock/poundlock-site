@@ -13,19 +13,23 @@ import { createRoot } from 'react-dom/client'
 import { PoundlockHero, type Copy } from './hero'
 import { designSize } from './size.js'
 
-type Size = { width: number; height: number }
+type Size = { width: number; height: number; compactHeight: number }
 
 function SiteHero({ element, copy }: { element: HTMLElement; copy: Copy }) {
   const [size, setSize] = useState<Size>(() => designSize(element.clientWidth, element.clientHeight))
   useLayoutEffect(() => {
     const ro = new ResizeObserver(() => {
       const next = designSize(element.clientWidth, element.clientHeight)
-      setSize((prev) => (prev.width === next.width && prev.height === next.height ? prev : next))
+      setSize((prev) =>
+        prev.width === next.width && prev.height === next.height && prev.compactHeight === next.compactHeight ? prev : next,
+      )
     })
     ro.observe(element)
     return () => ro.disconnect()
   }, [element])
-  return <PoundlockHero className="ph--site" fill copy={copy} width={size.width} height={size.height} />
+  return (
+    <PoundlockHero className="ph--site" fill copy={copy} width={size.width} height={size.height} compactHeight={size.compactHeight} />
+  )
 }
 
 export function mountHeroDemo(element: HTMLElement) {

@@ -122,50 +122,48 @@
   }
 }
 
-/* 首屏演示：有脚本时一开始就按演示的版式排、把位置留好（挂上的那一刻版式不跳）；
-   右边一直铺到页面边上，终端从那里出画。演示挂不上（省流量、出错、入口脚本没取到）才退回图标的三片。
-   留给演示的这块地方多大由这里定，演示再按它的长宽比定自己的设计尺寸（tools/stage 的入口：字放大到 1.45 倍
+/* 首屏演示：有脚本时一开始就按演示的版式排、把位置留好（挂上的那一刻版式不跳）。
+   终端是一扇完整的窗口，铺满留给它的这块地方，左右边对齐页面内容区的边线（和页头的标志、右边的按钮一条线），
+   不出画、不贴屏幕边。演示挂不上（省流量、出错、入口脚本没取到）才退回图标的三片。
+   这块地方多大由这里定，演示再按它的长宽比定自己的设计尺寸（tools/stage/size.js：字放大到 1.45 倍
    就不再放大，多出来的地方让终端变宽、变高）。所以这块地方不能反过来被演示的内容撑大：contain: size。 */
 .hero__demo {
   display: none;
 }
 
 .js .hero:not(.hero--no-demo) {
-  /* 标题、按钮那条左边线到屏幕左边的距离（和页头、其他各节对齐） */
-  --hero-left: max(var(--page-pad), calc((100vw - var(--page-max)) / 2));
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
 }
 
 .js .hero:not(.hero--no-demo) .hero__mark {
   display: none;
 }
 
-/* 宽屏：左边字、右边终端。终端高是宽的 0.9 倍，但不超出首屏里剩下的高度（剩下的不够就排扁一些），
-   这样宽屏上上下不会空出一截，矮屏上也不会把终端底下的输入框挤出首屏。 */
+/* 宽屏：左边字、右边终端，终端的右边就是内容区的右边线。终端是方的，但不超出首屏里剩下的高度
+   （剩下的不够就排扁一些），矮屏上也不会把终端底下的输入框挤出首屏。
+   右栏至少 600 宽（1200 的内容区里右栏 1.12 份是 608）：窄于 600 演示会换成手机那一版。 */
 .js .hero:not(.hero--no-demo) .hero__demo {
   display: block;
   position: relative;
   z-index: 1;
   contain: size;
-  /* 有长宽比的格子默认不横向撑满，高度被 max-height 截住时宽度也跟着缩，终端就够不着屏幕右边、
-     在半空被舞台的边切断。写明撑满：宽度总是这一栏加出血，被截的只有高度。 */
+  /* 有长宽比的格子默认不横向撑满，高度被 max-height 截住时宽度也跟着缩，右边就对不齐内容区。
+     写明撑满：宽度总是这一栏，被截的只有高度。 */
   justify-self: stretch;
-  aspect-ratio: 10 / 9;
+  aspect-ratio: 1 / 1;
   min-height: 440px;
   max-height: calc(100svh - 64px - var(--space-6) - var(--space-7));
-  margin-right: calc(-1 * var(--hero-left));
 }
 
-/* 屏幕不到 1280 宽时，右栏多给一些：演示那块地方窄于 600 会换成手机那一版 */
-@media (max-width: 1279px) {
+/* 屏幕不到 1440 宽时内容区窄于 1200，右栏多给一些，免得窄于 600 */
+@media (max-width: 1439px) {
   .js .hero:not(.hero--no-demo) {
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
   }
 }
 
 /* 高屏（窗口偏方，又够高）：左右排的话，上下各空出几百像素。改成上下排：
-   上面一条，标题在左、副标题和按钮在右边和它底边对齐；下面整条给终端，从标题那条左边线一直铺到屏幕右边，
-   占满首屏剩下的高度。终端的左边要正好落在左边线上：舞台里窗口左边有 40 的边距，放大 1.45 倍是 58px，往外挪掉。 */
+   上面一条，标题在左、副标题和按钮在右边和它底边对齐；下面整条给终端，左右对齐内容区，占满首屏剩下的高度。 */
 @media (min-width: 901px) and (max-aspect-ratio: 3 / 2) and (min-height: 1000px) {
   .js .hero:not(.hero--no-demo) {
     grid-template-columns: minmax(0, 1fr);
@@ -209,13 +207,12 @@
     margin-top: var(--space-5);
   }
 
+  /* 太高的窗口里终端不比宽的 0.9 倍更高（内容区宽 = 屏幕宽减去两边到边线的距离）。
+     1878 × 1503 这样的窗口里不会碰到这个上限，终端正好占满剩下的高度 */
   .js .hero:not(.hero--no-demo) .hero__demo {
     aspect-ratio: auto;
     min-height: 520px;
-    max-height: calc((100vw - var(--hero-left)) * 0.72);
-    /* 挪出去的 m = 40 × 舞台放大倍数。通常倍数正好 1.45（m = 58px）；地方小、设计宽停在 720 时
-       m = 40 × W0 / 680，太宽、设计宽停在 1280 时 m = 40 × W0 / 1240（W0 是左边线到屏幕右边，推法同单栏）。 */
-    margin-left: calc(-1 * clamp((100vw - var(--hero-left)) * 40 / 1240, 58px, (100vw - var(--hero-left)) * 40 / 680));
+    max-height: calc((100vw - 2 * max(var(--page-pad), calc((100vw - var(--page-max)) / 2))) * 0.9);
   }
 }
 
@@ -264,16 +261,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* 单栏时终端按 4:3 排，也一直铺到屏幕右边：从屏幕边上出画，不在半空被切断。
-     左边往外挪出舞台自己的那道边距，终端的左边正好落在标题、按钮那条左边线上。
-     演示宽 W = W0 + m（W0 是从左边线到屏幕右边），缩放 W / 设计宽，舞台左边距 g 放大以后等于 m：
-     m = g × W0 / (设计宽 - g)。宽版设计宽 720、g = 40；手机版 358、g = 16（在下面）。 */
+  /* 单栏时终端按 4:3 排，左右对齐页边距 */
   .js .hero:not(.hero--no-demo) .hero__demo {
-    aspect-ratio: 720 / 540;
+    aspect-ratio: 4 / 3;
     min-height: 0;
     max-height: none;
-    margin-right: calc(-1 * var(--page-pad));
-    margin-left: calc(-1 * (100vw - var(--page-pad)) * 40 / 680);
   }
 
   .hero {
@@ -298,11 +290,10 @@
   }
 }
 
-/* 窄到演示换成手机那一版（容器窄于 600）时，留的位置按手机版的长宽比 */
-@media (max-width: 640px) {
+/* 窄到演示换成手机那一版（那块地方窄于 600，屏幕 666 宽上下）时，留的位置按手机版的长宽比 */
+@media (max-width: 680px) {
   .js .hero:not(.hero--no-demo) .hero__demo {
     aspect-ratio: 358 / 372;
-    margin-left: calc(-1 * (100vw - var(--page-pad)) * 16 / 342);
   }
 }
 

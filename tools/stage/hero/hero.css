@@ -4,7 +4,8 @@
 
 .ph {
   & .ss-stage {
-    overflow: hidden;
+    /* 不裁：窗口铺满舞台，它的阴影画到舞台外面去（阴影只是画上去的，不占位）。窗口自己会裁里面的内容 */
+    overflow: visible;
     background: var(--ph-ground, linear-gradient(140deg, #0b6088, #041b33 78%));
     --ss-mono: var(--ph-mono, "Cascadia Mono", Consolas, ui-monospace, "Microsoft YaHei", monospace);
     --ph-bright: #ecf7fd;
@@ -13,14 +14,12 @@
     --ph-accent: #7fe3ff;
   }
 
-  /* 终端：比水面暗一级的实心面，一道细亮边；上、左、下各留一道边距，往右跑出画面 80px（右边只有空的终端）。
-     舞台的设计尺寸由官网按留给它的地方定（不一定是 720 × 540），所以右边按舞台边算，不写死宽度。 */
+  /* 终端：比水面暗一级的实心面，一道细亮边；一扇完整的窗口，铺满舞台，不出画。
+     所以官网留给演示的那块地方就是窗口本身：左右边对齐页面内容区的边线，不用再算往外挪多少。
+     舞台的设计尺寸由官网按那块地方的长宽比定（不一定是 720 × 540）。 */
   & .ph-win {
     position: absolute;
-    left: 40px;
-    top: 40px;
-    bottom: 40px;
-    right: -80px;
+    inset: 0;
     --ss-term-bg: #071b2e;
     --ss-term-dim: var(--ph-faint);
     /* 不是一整块平的暗色：光从左上来（和首屏水面的光同一个方向），面上左上亮一点、往右下沉下去，
@@ -40,13 +39,6 @@
     mask-image: linear-gradient(180deg, transparent 0, transparent 10px, #000 60px);
   }
 
-  & .ss-stage[data-layout="compact"] .ph-win {
-    left: 16px;
-    top: 16px;
-    bottom: 16px;
-    right: -38px;
-  }
-
   & .ss-stage[data-layout="compact"] .ph-win > .ss-window__body {
     -webkit-mask-image: linear-gradient(180deg, transparent 0, transparent 6px, #000 44px);
     mask-image: linear-gradient(180deg, transparent 0, transparent 6px, #000 44px);
@@ -58,15 +50,14 @@
     height: 100%;
     justify-content: flex-end;
     gap: 0;
-    /* 右边：窗口往右出画 80px，内容在舞台边以内一道边距（40px）处就止住、折行，出画的只有空的终端 */
-    padding: 6px 160px 22px 24px;
+    padding: 6px 24px 22px 24px;
     color: var(--ph-text);
     font-size: 15px;
     line-height: 23px;
   }
 
   & .ss-stage[data-layout="compact"] .ph-term {
-    padding: 4px 54px 14px 14px;
+    padding: 4px 14px 14px 14px;
     font-size: 12.5px;
     line-height: 19px;
   }
@@ -298,15 +289,16 @@
     background: var(--ph-bright);
   }
 
-  /* 键帽：离舞台边一道边距，用终端抬高一级的面，不用中性的炭灰 */
+  /* 键帽：在输入框里面的右端（输入框右边到舞台边是终端的内边距 24，键帽再往里 8；竖着和输入框居中），
+     用终端抬高一级的面，不用中性的炭灰 */
   & .ss-keys[data-at="bottom-right"] {
-    right: 64px;
-    bottom: 64px;
+    right: 32px;
+    bottom: 28px;
   }
 
   & .ss-stage[data-layout="compact"] .ss-keys[data-at="bottom-right"] {
-    right: 30px;
-    bottom: 30px;
+    right: 20px;
+    bottom: 16px;
   }
 
   & .ss-key {

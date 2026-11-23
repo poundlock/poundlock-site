@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as facts from '../src/facts.js';
 import { render } from '../src/sections/hero.js';
-import { designSize, SCALE, MIN_W, MAX_W, MIN_H } from '../tools/stage/size.js';
+import { designSize, SCALE, MIN_W, MAX_W, MIN_H, COMPACT_W } from '../tools/stage/size.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...parts) => readFileSync(path.join(ROOT, ...parts), 'utf8');
@@ -57,19 +57,24 @@ test('首屏：有演示的文案就留演示的位置，文案原样写在 data
 });
 
 test('设计尺寸：字放大到 1.45 倍为止，舞台缩放以后正好填满留给它的地方', () => {
-  // 宽屏版式（1920 × 955 上的那一块）：设计宽停在 720，按宽度缩放
-  assert.deepEqual(designSize(936, 771), { width: 720, height: 593 });
+  // 宽屏版式（1920 × 955 上右栏那一块，609 见方）：设计宽停在下限，按宽度缩放
+  const wide = designSize(609, 609);
+  assert.equal(wide.width, MIN_W);
+  assert.equal(wide.height, Math.round((609 * MIN_W) / 609));
   // 高屏版式（1878 × 1503 上的那一块）：字到 1.45 倍，终端变宽、变高
-  const tall = designSize(1597, 1104);
-  assert.equal(tall.width, Math.round(1597 / SCALE));
-  assert.ok(Math.abs((tall.height * 1597) / tall.width - 1104) < 2, '缩放以后高度对不上留给它的地方');
+  const tall = designSize(1200, 1032);
+  assert.equal(tall.width, Math.round(1200 / SCALE));
+  assert.ok(Math.abs((tall.height * 1200) / tall.width - 1032) < 2, '缩放以后高度对不上留给它的地方');
   // 很宽：设计宽停在上限，再宽字才继续放大
   assert.equal(designSize(4000, 1500).width, MAX_W);
-  // 小：不比 720 窄；扁：不比 440 矮
+  // 小：不比下限窄；扁：不比下限矮
   assert.equal(designSize(500, 400).width, MIN_W);
-  assert.equal(designSize(1400, 300).height, MIN_H);
+  assert.equal(designSize(1400, 200).height, MIN_H);
+  // 手机那一版（宽 358）：设计高按那块地方的长宽比
+  assert.equal(designSize(350, 364).compactHeight, Math.round((364 * COMPACT_W) / 350));
+  assert.equal(designSize(358, 372).compactHeight, 372);
   // 量不到尺寸（还没排版）：按原来的 720 × 540
-  assert.deepEqual(designSize(0, 0), { width: 720, height: 540 });
+  assert.deepEqual(designSize(0, 0), { width: 720, height: 540, compactHeight: 372 });
 });
 
 test('打包好的演示带着 Stageshow 的版权声明，许可证文件在源码旁边', () => {

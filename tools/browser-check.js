@@ -1013,8 +1013,8 @@ export const CHECKS = [
     },
   },
   {
-    // 首屏演示（tools/stage 打包的 React 终端）：挂得上、挂上时版式不跳、终端从屏幕右边出画、
-    // 左边对齐标题那条线（单栏和高屏版式）、宽屏和高屏版式里整个终端都在首屏以内、不横向溢出、字是 hero-demo.json 里的。
+    // 首屏演示（tools/stage 打包的 React 终端）：挂得上、挂上时版式不跳、终端是完整的窗口（右边对齐内容区的右边线，
+    // 单栏和高屏版式里左边也对齐左边线）、宽屏和高屏版式里整个终端都在首屏以内、不横向溢出、字是 hero-demo.json 里的。
     name: 'hero-demo',
     viewports: ['360', '820', '1440', 'tall', 'tall-narrow'],
     async run({ page, context, url, viewport, shot }) {
@@ -1060,6 +1060,15 @@ export const CHECKS = [
           title: box('.hero__title'),
           copy: box('.hero__copy'),
           win: box('.ph-win'),
+          // 内容区的两条边线：首屏去掉左右内边距（和页头的标志、右边的按钮一条线）
+          lineLeft: (() => {
+            const hero = document.querySelector('.hero');
+            return hero.getBoundingClientRect().left + parseFloat(getComputedStyle(hero).paddingLeft);
+          })(),
+          lineRight: (() => {
+            const hero = document.querySelector('.hero');
+            return hero.getBoundingClientRect().right - parseFloat(getComputedStyle(hero).paddingRight);
+          })(),
           text: document.querySelector('.ph-term')?.textContent ?? '',
           layout: document.querySelector('.ss-stage')?.dataset.layout,
           vw: document.documentElement.clientWidth,
@@ -1070,12 +1079,15 @@ export const CHECKS = [
       expect(!m.noDemo && m.win, '演示没挂上（hero 上标了 hero--no-demo，或者找不到终端窗口）');
       expect(!m.markShown, '演示挂上了，图标的三片还显示着');
       expect(m.text.includes(demo.allDone), `终端里没有「${demo.allDone}」，文案不是从 hero-demo.json 来的？`);
-      expect(m.win.right > m.vw, `终端的右边在 ${Math.round(m.win.right)}，没有跑出屏幕右边（${m.vw}），在半空被切断了`);
+      // 终端是一扇完整的窗口：右边对齐内容区的右边线，不出画、不贴屏幕边
+      expect(Math.abs(m.win.right - m.lineRight) <= 2, `终端的右边 ${Math.round(m.win.right)} 没对齐内容区的右边线 ${Math.round(m.lineRight)}`);
+      expect(m.win.right < m.vw, `终端的右边 ${Math.round(m.win.right)} 跑出了屏幕（${m.vw}）`);
       expect(m.scrollWidth <= m.vw + 1, `横向溢出：scrollWidth ${m.scrollWidth} > ${m.vw}`);
       const split = viewport.name === '1440';
       if (split) {
         expect(m.win.left >= m.copy.right, `宽屏版式里终端（左边 ${Math.round(m.win.left)}）压到了左边的字上（${Math.round(m.copy.right)}）`);
       } else {
+        expect(Math.abs(m.win.left - m.lineLeft) <= 2, `终端的左边 ${Math.round(m.win.left)} 没对齐内容区的左边线 ${Math.round(m.lineLeft)}`);
         expect(Math.abs(m.win.left - m.title.left) <= 2, `终端的左边 ${Math.round(m.win.left)} 没对齐标题的左边 ${Math.round(m.title.left)}`);
       }
       if (split || viewport.name.startsWith('tall')) {
