@@ -168,6 +168,7 @@ function openStage(root, anime) {
   const track = root.querySelector('[data-lock-track]');
   const canvas = root.querySelector('[data-lock-canvas]');
   const chambers = [...root.querySelectorAll('[data-stage]')];
+  const ticks = [...root.querySelectorAll('[data-rail-beat]')];
   const tags = [...root.querySelectorAll('[data-ledger-beat]')];
 
   // --lock-progress 写在这一节上（只有收尾那两处淡入淡出读它）；--rise 写在页头上（只有页头读它，
@@ -186,7 +187,15 @@ function openStage(root, anime) {
     if (beat === shownBeat) return;
     shownBeat = beat;
     root.dataset.beat = String(beat);
-    chambers.forEach((chamber, i) => chamber.toggleAttribute('data-current', i === beat));
+    // data-past：已经过去的几段。换段时它们往上淡走、后面的从下面浮上来；往回滚正好反过来（lock.css）
+    chambers.forEach((chamber, i) => {
+      chamber.toggleAttribute('data-current', i === beat);
+      chamber.toggleAttribute('data-past', i < beat);
+    });
+    ticks.forEach((tick, i) => {
+      tick.toggleAttribute('data-current', i === beat);
+      tick.toggleAttribute('data-past', i < beat);
+    });
     // data-in：已经落下的产物；data-now：这一拍刚落下的（手机上放不下全部，只显示这些）。
     tags.forEach((tag) => {
       const at = Number(tag.dataset.ledgerBeat);
@@ -292,7 +301,14 @@ function openStage(root, anime) {
       root.removeAttribute('data-lock-film');
       rootVars.clear('--lock-progress');
       headerVars.clear('--rise');
-      chambers.forEach((chamber) => chamber.removeAttribute('data-current'));
+      chambers.forEach((chamber) => {
+        chamber.removeAttribute('data-current');
+        chamber.removeAttribute('data-past');
+      });
+      ticks.forEach((tick) => {
+        tick.removeAttribute('data-current');
+        tick.removeAttribute('data-past');
+      });
       tags.forEach((tag) => {
         tag.removeAttribute('data-in');
         tag.removeAttribute('data-now');

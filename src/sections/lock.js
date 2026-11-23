@@ -26,6 +26,16 @@ function chamber(t, stage) {
       </li>`;
 }
 
+// 水尺：八格，走到第几段亮第几格（只是画面，读屏读的是下面的八段）。live 是动效那一层，由 lock.js 标当前这一格；
+// 不是 live 的（水面以上那一层，停在最后一段）直接画成走完了的样子。
+function rail(live) {
+  return html`<div class="lock__rail" aria-hidden="true">
+          ${stages.map((stage, i) =>
+            live ? html`<span class="lock__tick" data-rail-beat="${i}"></span>` : html`<span class="lock__tick" ${i === stages.length - 1 ? 'data-current' : 'data-past'}></span>`,
+          )}
+        </div>`;
+}
+
 // 账本：每一段留下的产物。beat 是它在第几拍落进来（水面以上那一份全都在，不带这个属性）。
 function ledger(t, live) {
   return html`<div class="lock__ledger" aria-hidden="true">
@@ -60,6 +70,8 @@ export function render(ctx) {
       <!-- 水面以上：同一张图换成浅色版，停在最后一段。动效在的时候垫在水的下面，水退下去才露出来。 -->
       <div class="lock__layer lock__air on-light" aria-hidden="true">
         <div class="lock__scene">${renderScene({ tone: 'light' })}</div>
+        <div class="lock__copy">
+        ${rail(false)}
         <div class="lock__flight">
           <div class="chamber" data-current>
             <p class="chamber__head"><span class="chamber__id">${last.id}</span><strong class="chamber__name">${lastCopy.name}</strong></p>
@@ -69,13 +81,17 @@ export function render(ctx) {
             </ul>
           </div>
         </div>
+        </div>
         ${ledger(t, false)}
       </div>
       <div class="lock__layer lock__water" data-lock-water>
         <div class="lock__scene" aria-hidden="true">${renderScene()}</div>
+        <div class="lock__copy">
+        ${rail(true)}
         <ol class="lock__flight">
           ${stages.map((stage) => chamber(t, stage))}
         </ol>
+        </div>
         ${ledger(t, true)}
       </div>
       <!-- 水面：一道波，带一线亮光，底下一条往下淡出的亮带。水从上往下退的时候，它压在水的上沿。 -->

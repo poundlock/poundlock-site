@@ -126,6 +126,10 @@
   margin-bottom: var(--space-7);
 }
 
+.lock__rail {
+  display: none;
+}
+
 .lock__flight {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -221,7 +225,7 @@
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: minmax(0, 0.62fr) minmax(0, 1.38fr);
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
   grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas:
     "text scene"
@@ -305,43 +309,135 @@
   transform: translateY(var(--river));
 }
 
-/* 八个阶段的说明叠在同一个位置，一次只露当前这一段。 */
-.js.stage-ok .lock__flight {
+/* 文字那一栏：上面一根水尺，下面八段说明叠在同一个位置，一次只露当前这一段。 */
+.js.stage-ok .lock__copy {
   grid-area: text;
+  align-self: center;
+  max-width: 34rem;
+}
+
+/* 水尺：八格，走过的实、当前这一格长一截亮起来、没到的只有一道细线。和画面里「过了几道闸」是一个意思。 */
+.js.stage-ok .lock__rail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-4);
+}
+
+.lock__tick {
+  width: 22px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--fg) 22%, transparent);
+  transition: width 420ms var(--ease-water), background-color 260ms ease;
+}
+
+.lock__tick[data-past] {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.lock__tick[data-current] {
+  width: 46px;
+  background: var(--accent);
+}
+
+.js.stage-ok .lock__flight {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
-  align-self: center;
 }
 
 .js.stage-ok .chamber {
   grid-area: 1 / 1;
-  opacity: 0;
   /* 只是看不见：不用 visibility 藏，读屏照样读得到全部八段。 */
   pointer-events: none;
-  transform: translateY(14px);
-  transition: opacity 260ms ease, transform 420ms var(--ease-water);
+}
+
+/* 换段：这一段里的几样（名字、说明、原话、角色、补充）各自动。
+   没到的几段停在下面一点、过去的几段停在上面一点，都是透明、略糊的；
+   当前这一段的几样依次浮到原位、变清楚（错开几十毫秒），离开的那段往它那一边淡走得快一些。
+   往下滚是新的一段从下面浮上来、旧的往上走；往回滚正好反过来。 */
+.js.stage-ok .chamber > * {
+  opacity: 0;
+  transform: translateY(22px);
+  filter: blur(6px);
+  transition:
+    opacity 200ms ease,
+    transform 320ms ease,
+    filter 200ms ease;
+}
+
+.js.stage-ok .chamber[data-past] > * {
+  transform: translateY(-18px);
 }
 
 .js.stage-ok .chamber[data-current],
 .js.stage-ok .lock:not([data-lock-live]) .lock__water .chamber:first-child {
-  opacity: 1;
   pointer-events: auto;
+}
+
+.js.stage-ok .chamber[data-current] > *,
+.js.stage-ok .lock:not([data-lock-live]) .lock__water .chamber:first-child > * {
+  opacity: 1;
   transform: none;
+  filter: none;
+  transition:
+    opacity 380ms ease var(--enter, 0ms),
+    transform 640ms var(--ease-water) var(--enter, 0ms),
+    filter 420ms ease var(--enter, 0ms);
+}
+
+.js.stage-ok .chamber[data-current] > :nth-child(2) {
+  --enter: 70ms;
+}
+
+.js.stage-ok .chamber[data-current] > :nth-child(3) {
+  --enter: 130ms;
+}
+
+.js.stage-ok .chamber[data-current] > :nth-child(n + 4) {
+  --enter: 180ms;
+}
+
+/* 字号跟着视口走（宽和高里取小的那个），大屏上到顶：标题 72px、说明 26px。 */
+.js.stage-ok .chamber__head {
+  gap: 0.35em;
 }
 
 .js.stage-ok .chamber__id {
-  font-size: var(--text-6);
+  font-size: clamp(var(--text-6), min(4vw, 5.2svh), var(--text-8) + 0.75rem);
 }
 
 .js.stage-ok .chamber__name {
-  font-size: clamp(var(--text-6), 3.6vw, var(--text-7));
+  font-size: clamp(var(--text-6), min(4vw, 5.2svh), var(--text-8) + 0.75rem);
+  line-height: 1.1;
 }
 
 .js.stage-ok .chamber__line {
-  margin-top: var(--space-3);
-  font-size: var(--text-4);
+  max-width: 22em;
+  margin-top: var(--space-4);
+  font-size: clamp(var(--text-4), min(1.45vw, 1.9svh), var(--text-5) + 0.125rem);
   line-height: 1.6;
+}
+
+.js.stage-ok .chamber__roles {
+  margin-top: var(--space-4);
+  gap: 10px;
+}
+
+.js.stage-ok .chamber .chip {
+  padding: 0.3em 1em;
+  font-size: var(--text-3);
+}
+
+.js.stage-ok .chamber__note {
+  margin-top: var(--space-3);
+  font-size: var(--text-2);
+}
+
+.js.stage-ok .chamber__words {
+  margin-top: var(--space-4);
+  font-size: var(--text-3);
 }
 
 /* 每一段的产物在底下的清单里演；这里的这一份看不见，留给读屏。 */
@@ -420,8 +516,21 @@
     display: none;
   }
 
-  .js.stage-ok .lock__flight {
+  .js.stage-ok .lock__copy {
     align-self: start;
+  }
+
+  .js.stage-ok .lock__rail {
+    margin-bottom: var(--space-2);
+  }
+
+  .lock__tick {
+    width: 16px;
+    height: 3px;
+  }
+
+  .lock__tick[data-current] {
+    width: 32px;
   }
 
   .js.stage-ok .chamber__id {
@@ -435,6 +544,16 @@
   .js.stage-ok .chamber__line {
     margin-top: var(--space-2);
     font-size: var(--text-3);
+  }
+
+  .js.stage-ok .chamber__roles {
+    margin-top: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .js.stage-ok .chamber .chip {
+    padding: 0.2em 0.85em;
+    font-size: var(--text-2);
   }
 
   .js.stage-ok .chamber__words {
@@ -512,7 +631,7 @@
 .js.stage-ok .lock[data-lock-film] .lock__water {
   clip-path: none;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--shade) 84%, transparent) 0%, color-mix(in srgb, var(--shade) 58%, transparent) 30%, transparent 58%),
+    linear-gradient(90deg, color-mix(in srgb, var(--shade) 86%, transparent) 0%, color-mix(in srgb, var(--shade) 62%, transparent) 34%, transparent 64%),
     linear-gradient(0deg, color-mix(in srgb, var(--shade) 90%, transparent) 0%, transparent 32%);
   opacity: clamp(0, calc((0.985 - var(--lock-progress, 0)) * 30), 1);
 }
@@ -611,11 +730,25 @@
     display: none;
   }
 
+  .js.stage-ok .lock__rail {
+    margin-bottom: var(--space-3);
+  }
+
+  .js.stage-ok .chamber__id,
   .js.stage-ok .chamber__name {
     font-size: var(--text-6);
   }
 
   .js.stage-ok .chamber__line {
+    margin-top: var(--space-3);
     font-size: var(--text-3);
+  }
+
+  .js.stage-ok .chamber__roles {
+    margin-top: var(--space-3);
+  }
+
+  .js.stage-ok .chamber .chip {
+    font-size: var(--text-2);
   }
 }
