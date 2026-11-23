@@ -53,6 +53,7 @@ uniform vec3 u_surface;
 uniform vec3 u_floor;
 // 终端、标题在画布里的位置（像素，原点在左下）：x、y、宽、高；宽是 0 就是没有
 uniform vec4 u_glass;
+uniform float u_glassR;
 uniform vec4 u_calm;
 
 // 水面远到看不清的那条线（屏幕从下往上 0 到 1）
@@ -95,13 +96,24 @@ float inRect(vec2 px, vec4 r, float soft) {
   return 1.0 - smoothstep(-soft, soft, max(d.x, d.y));
 }
 
+// 圆角的长方形（终端窗口是圆角的）：直角的话四个角会露在窗口外面，看着像角上拖着一块影子
+float inRoundRect(vec2 px, vec4 r, float rad, float soft) {
+  if (r.z <= 0.0) return 0.0;
+  vec2 hs = r.zw * 0.5;
+  float k = min(rad, min(hs.x, hs.y));
+  vec2 q = abs(px - (r.xy + hs)) - (hs - vec2(k));
+  float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - k;
+  // 往里收一个像素，暗影不碰到窗口的边线
+  return 1.0 - smoothstep(-soft, soft, d + 1.0);
+}
+
 void main() {
   vec2 px = gl_FragCoord.xy;
   vec2 uv = px / u_res;
   float aspect = u_res.x / u_res.y;
   float t = u_time;
   // 终端后面：糊开、压暗；标题那一块：波光、微尘压淡
-  float glass = inRect(px, u_glass, 2.0);
+  float glass = inRoundRect(px, u_glass, u_glassR, 1.5);
   float calm = inRect(px, u_calm, u_res.y * 0.1) * 0.5;
   float detail = 1.0 - glass;
 
@@ -266,6 +278,7 @@ export function mountWater(canvas, { reduced = false, onDegrade } = {}) {
     gl.uniform3fv(gl.getUniformLocation(program, uniform), hexToRgb(css.getPropertyValue(name)) ?? DEFAULT_COLORS[name]);
   }
   const uGlass = gl.getUniformLocation(program, 'u_glass');
+  const uGlassR = gl.getUniformLocation(program, 'u_glassR');
   const uCalm = gl.getUniformLocation(program, 'u_calm');
 
   // 终端、标题在画布里的位置。它们只在版式变了（改窗口大小、演示挂上）时才动，不用每帧量：隔 30 帧量一次。
@@ -286,7 +299,17 @@ export function mountWater(canvas, { reduced = false, onDegrade } = {}) {
   const measure = () => {
     measureIn = burst > 0 ? 0 : 30;
     if (burst > 0) burst--;
-    gl.uniform4fv(uGlass, rectIn(hero && hero.querySelector('.hero__demo[data-ready] .ph-win')));
+    const glassEl = hero && hero.querySelector('.hero__demo[data-ready] .ph-win');
+    gl.uniform4fv(uGlass, rectIn(glassEl));
+    // 窗口的圆角半径，换算到画布像素：样式里的半径 × 演示的缩放（窗口在一个放大过的舞台里）× 画布的分辨率
+    let radius = 0;
+    if (glassEl) {
+      const box = glassEl.getBoundingClientRect();
+      const css = parseFloat(win.getComputedStyle(glassEl).borderTopLeftRadius) || 0;
+      const c = canvas.getBoundingClientRect();
+      if (glassEl.offsetWidth && c.width) radius = css * (box.width / glassEl.offsetWidth) * (canvas.width / c.width);
+    }
+    gl.uniform1f(uGlassR, radius);
     gl.uniform4fv(uCalm, rectIn(hero && hero.querySelector('.hero__copy')));
   };
 
