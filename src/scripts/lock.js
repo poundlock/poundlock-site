@@ -34,6 +34,28 @@ export const FOLLOW = 12;
 export const FADE_FROM = 0.95;
 export const FADE_TO = 0.9955;
 
+// 滚轮一格走一段：每一段停在哪（进度）。有长条图的清单时停在每段场景的正中（镜头中心对着那一段的中间），
+// 第一段停在开头、最后一段停在出水停下的那一幅；没有清单（平面的图）时停在每一拍的正中。
+// 停的位置一定落在那一段的拍子里（beatAt 对得上）。纯函数，Node 里能测。
+export function stopsOf(reef, beats = BEATS) {
+  const stops = [];
+  for (let i = 0; i < beats; i++) {
+    if (i === 0) stops.push(0);
+    else if (i === beats - 1) stops.push(1);
+    else if (reef && reef.sceneLen && reef.xEnd > reef.xStart) stops.push(((i + 0.5) * reef.sceneLen - reef.xStart) / (reef.xEnd - reef.xStart));
+    else stops.push((i + 0.5) / beats);
+  }
+  return stops;
+}
+
+// 从进度 p 往 dir（1 往下、-1 往上）滚一格该停在哪：下一个停点；已经在最后一个（或第一个）就是 null，照常滚出这一节
+export function nextStop(stops, p, dir) {
+  const eps = 0.002;
+  if (dir > 0) return stops.find((s) => s > p + eps) ?? null;
+  for (let i = stops.length - 1; i >= 0; i--) if (stops[i] < p - eps) return stops[i];
+  return null;
+}
+
 export function fadeProgress(progress) {
   return Math.min(FADE_TO, Math.max(FADE_FROM, progress));
 }
@@ -279,6 +301,64 @@ function openStage(root, anime) {
 
   const onChange = () => apply();
   win.addEventListener('scroll', onChange, { passive: true });
+
+  // 滚轮一格走一段（用户：「能不能做成滚轮滚一下，就切换一下场景」）。只在舞台粘住的时候接管滚轮：
+  // 滚一下，页面用 0.7 秒滑到下一段的停点（画面再带着惯性追过去）；滑的途中、或者触控板一次手势里连着来的滚轮都算这一下，
+  // 不会连跳好几段；手停下（0.25 秒没有滚轮）再滚才是下一下。第一段往上、最后一段往下照常滚出这一节。
+  // 键盘、触屏、拖滚动条照旧，不接管。
+  const stops = stopsOf(readReef(canvas));
+  let glide = null;
+  let lastWheel = -1e9;
+  let held = false; // 这一下手势已经被接管：手停下之前连着来的滚轮（触控板的惯性尾巴也是）都吞掉
+  // 页面里有元素拿着焦点时 base.css 开着平滑滚动，scrollTo 每一帧都会变成一段慢慢滚，所以写明 instant
+  const jump = (y) => {
+    try {
+      win.scrollTo({ top: y, behavior: 'instant' });
+    } catch {
+      win.scrollTo(0, y);
+    }
+  };
+  const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+  const glideTo = (target) => {
+    const rect = track.getBoundingClientRect();
+    const range = rect.height - win.innerHeight;
+    const top = win.scrollY + rect.top;
+    const from = win.scrollY;
+    const to = Math.round(top + range * target);
+    const start = win.performance.now();
+    const duration = 700;
+    if (glide) win.cancelAnimationFrame(glide.frame);
+    glide = { target, frame: 0 };
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      jump(Math.round(from + (to - from) * easeInOut(t)));
+      if (t < 1) glide.frame = win.requestAnimationFrame(tick);
+      else glide = null;
+    };
+    glide.frame = win.requestAnimationFrame(tick);
+  };
+  const onWheel = (event) => {
+    if (event.ctrlKey || !event.deltaY) return;
+    const now = win.performance.now();
+    const sameGesture = now - lastWheel < 250;
+    lastWheel = now;
+    if (sameGesture && held) {
+      event.preventDefault();
+      return;
+    }
+    held = false;
+    const rect = track.getBoundingClientRect();
+    const range = rect.height - win.innerHeight;
+    if (range <= 0 || rect.top > 1 || rect.bottom < win.innerHeight - 1) return;
+    // 正在滑：从要去的那一段算，不从滑到一半的位置算（滑的途中隔一会儿再滚一下，接着去再下一段）
+    const from = glide ? glide.target : progressOf(rect, win.innerHeight);
+    const target = nextStop(stops, from, Math.sign(event.deltaY));
+    if (target === null) return;
+    event.preventDefault();
+    held = true;
+    glideTo(target);
+  };
+  win.addEventListener('wheel', onWheel, { passive: false });
   win.addEventListener('resize', onChange);
 
   apply();
@@ -288,6 +368,8 @@ function openStage(root, anime) {
     // 收干净：这一节要退回静态的清单（转屏以后放不下了），不能留着舞台的状态。
     destroy() {
       win.removeEventListener('scroll', onChange);
+      win.removeEventListener('wheel', onWheel);
+      if (glide) win.cancelAnimationFrame(glide.frame);
       win.removeEventListener('resize', onChange);
       observer.disconnect();
       nearby.disconnect();

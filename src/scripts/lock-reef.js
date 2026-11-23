@@ -128,10 +128,11 @@ export function createFishBehavior(seed = 7) {
   let dartUntil = -1;
   let dart = { x: 0, y: 0 };
   let clock = 0;
-  return function step(dt, { momentum = 0, aspect = 1.6, above = 0 } = {}) {
+  // left：鱼的中心最左到哪（按画面高算、从画面中线起），宽屏上说明那一栏在左边时由页面量出来，鱼尾不伸进字里
+  return function step(dt, { momentum = 0, aspect = 1.6, above = 0, left = -0.05 } = {}) {
     clock += dt;
-    const right = Math.min(0.62, 0.5 * aspect - 0.32);
-    const home = { x: Math.max(0.05, right * 0.45), y: 0.03 };
+    const right = Math.max(left + 0.06, Math.min(0.62, 0.5 * aspect - 0.32));
+    const home = { x: Math.max(0.05, right * 0.45, left + 0.05), y: 0.03 };
     if (clock > nextDart) {
       dart = { x: (random() - 0.35) * 0.32, y: (random() - 0.5) * 0.22 };
       dartUntil = clock + 1.0 + random() * 0.8;
@@ -145,7 +146,7 @@ export function createFishBehavior(seed = 7) {
     const push = Math.max(-0.12, Math.min(0.12, momentum * 2.0));
     let tx = home.x + wander.x + (darting ? dart.x : 0) + push;
     let ty = home.y + wander.y + (darting ? dart.y : 0) - above * 0.6;
-    tx = Math.max(-0.05, Math.min(right, tx));
+    tx = Math.max(left, Math.min(right, tx));
     ty = Math.max(-0.32, Math.min(0.22, ty));
     const k = darting ? 12 : 3.0;
     const c = 2 * Math.sqrt(k) * 0.9;
@@ -153,6 +154,11 @@ export function createFishBehavior(seed = 7) {
     state.vy += (k * (ty - state.y) - c * state.vy) * dt;
     state.x += state.vx * dt;
     state.y += state.vy * dt;
+    // 窜一下的弹簧会冲过头一点：左边那条线不让冲过去
+    if (state.x < left - 0.01) {
+      state.x = left - 0.01;
+      state.vx = Math.max(0, state.vx);
+    }
     const speed = Math.hypot(state.vx, state.vy);
     // 抬头低头：跟着上下的速度
     const tilt = Math.max(-0.35, Math.min(0.35, state.vy * 1.4));
@@ -675,14 +681,30 @@ export function mountReef(root, canvas, { onFail } = {}) {
   };
   canvas.addEventListener('webglcontextlost', onLost);
 
-  const layout = () => {
+  // 鱼最左到哪：说明那一栏排在画面左边（宽屏版式）时，鱼尾要留在它右边。用户截图里鱼游过去压在了说明的字上。
+  // 窄屏上字排在上面、横跨整个画面，不限。
+  const copyEl = root.querySelector('.lock__water .lock__copy');
+  let fishLeft = -0.05;
+  let measuredAt = -1e9;
+  const measureCopy = (now) => {
+    measuredAt = now;
+    fishLeft = -0.05;
+    if (!copyEl) return;
+    const c = canvas.getBoundingClientRect();
+    const r = copyEl.getBoundingClientRect();
+    if (!c.width || !c.height || !r.width || r.right - c.left > c.width * 0.55) return;
+    const half = ((fishGrid.len / m.viewH) * c.height) / 2;
+    fishLeft = Math.max(-0.05, (r.right - c.left + half * 0.85 + 16 - c.width / 2) / c.height);
+  };
+  const layout = (now) => {
     const ratio = Math.min(win.devicePixelRatio || 1, 2) * RESOLUTION;
     const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
     const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
-    }
+      measureCopy(now);
+    } else if (now - measuredAt > 1000) measureCopy(now);
     gl.viewport(0, 0, canvas.width, canvas.height);
   };
 
@@ -1019,7 +1041,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
       shown = follower.step(progress, dt, snap);
       momentum = snap ? 0 : momentumStep(momentum, follower.velocity, dt);
       watchdog.tick();
-      layout();
+      layout(now);
       const time = (now / 1000) % 3600;
       const aspect = canvas.width / canvas.height;
       const camX = cameraX(shown, m);
@@ -1037,7 +1059,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
       // 不是水下画面最上面那片最亮的水（整个往下沉的话，底下一截是亮青色的一片，像发白）
       const dy = above * (m.aboveTo || ABOVE_TO) * canvas.height;
       const sink = dy * 0.35;
-      const pose = behave(dt, { momentum, aspect, above: 0 });
+      const pose = behave(dt, { momentum, aspect, above: 0, left: fishLeft });
       const { eff, water, pxPerM } = draw(camX, time, dt, aspect, sink);
       flowX = camX;
       buildFx(flowX, time, eff, pxPerM, pose, sink, dy);

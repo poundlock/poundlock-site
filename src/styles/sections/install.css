@@ -2,7 +2,6 @@
    面板底下是那句不能省的提醒；再往下是第一次用的两步——这两步真的有先后，所以带序号。 */
 
 .install__panel {
-  max-width: 900px;
   padding: clamp(var(--space-4), 3vw, var(--space-5));
   border-radius: var(--radius-m);
   color: var(--fg);
@@ -32,7 +31,6 @@
 }
 
 .install__warning {
-  max-width: 46em;
   margin-top: var(--space-3);
   padding-top: var(--space-3);
   border-top: 1px solid var(--line);
@@ -48,7 +46,6 @@
 
 .install__first {
   display: grid;
-  max-width: 900px;
   margin-top: var(--space-3);
   counter-reset: step;
 }

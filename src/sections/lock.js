@@ -61,7 +61,6 @@ export function render(ctx) {
   return html`<section id="lock" class="lock" data-section="lock" data-zone="rise" data-lock>
   <header class="section__head lock__head">
     <h2 class="section__title">${t.lock.title}</h2>
-    <p class="section__lead">${t.lock.lead}</p>
   </header>
   <div class="lock__track" data-lock-track>
     <div class="lock__stage">

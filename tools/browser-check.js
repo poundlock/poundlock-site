@@ -154,7 +154,7 @@ export const CHECKS = [
       await page.goto(url, { waitUntil: 'load' });
       await page.waitForFunction(() => document.documentElement.classList.contains('motion-reduced'), null, { timeout: 5000 });
       expect(await page.isVisible('#hero h1'), '主标题看不见');
-      expect((await page.locator('#hero .btn').count()) === 2, '首屏的两个按钮不全');
+      expect((await page.locator('#hero .btn').count()) === 1, '首屏的「点星」按钮不在');
       expect(await page.isVisible(`#hero a[data-star]`), '点星按钮看不见');
       expect((await page.innerText('#hero h1')).replace(/\s+/g, '') === t.hero.h1.replace(/\s+/g, ''), '主标题的字不对');
       expect(uncaught.length === 0, `有未捕获的异常：${uncaught.join(' | ')}`);
@@ -194,6 +194,53 @@ export const CHECKS = [
         expect(got === beat, `滚到 ${fraction} 时 data-beat 是 ${got}，应当是 ${beat}`);
         await shot(`p${Math.round(Number(fraction) * 100)}`);
       }
+    },
+  },
+  {
+    // 过闸粘住时滚轮一格走一段（lock.js 的 onWheel）：滚一下到下一段；一下子连着滚好几格也只走一段；
+    // 最后一段往下、第一段往上照常滚出这一节。
+    name: 'lock-wheel',
+    viewports: ['1440'],
+    async run({ page, url }) {
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
+      const where = () =>
+        page.evaluate(() => {
+          const rect = document.querySelector('[data-lock-track]').getBoundingClientRect();
+          return { beat: document.querySelector('[data-lock]').dataset.beat, top: rect.top, bottom: rect.bottom - window.innerHeight };
+        });
+      await scrollLockTo(page, 0.002);
+      await page.waitForTimeout(800);
+      await page.mouse.move(720, 450);
+      await page.mouse.wheel(0, 100);
+      await page.waitForTimeout(1300);
+      let w = await where();
+      expect(w.beat === '1', `滚一格以后是第 ${w.beat} 拍，应当是 1`);
+      await page.evaluate(async () => {
+        for (let i = 0; i < 5; i++) {
+          window.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, cancelable: true, bubbles: true }));
+          await new Promise((resolve) => setTimeout(resolve, 30));
+        }
+      });
+      await page.waitForTimeout(1300);
+      w = await where();
+      expect(w.beat === '2', `连着滚五格以后是第 ${w.beat} 拍，应当只走一段到 2`);
+      await page.mouse.wheel(0, -100);
+      await page.waitForTimeout(1300);
+      w = await where();
+      expect(w.beat === '1', `往上滚一格以后是第 ${w.beat} 拍，应当回到 1`);
+      await scrollLockTo(page, 1);
+      await page.waitForTimeout(800);
+      await page.mouse.wheel(0, 100);
+      await page.waitForTimeout(800);
+      w = await where();
+      expect(w.bottom < -20, `最后一段往下滚，页面没滚出这一节（轨道底边离视口底 ${Math.round(w.bottom)}）`);
+      await scrollLockTo(page, 0);
+      await page.waitForTimeout(800);
+      await page.mouse.wheel(0, -100);
+      await page.waitForTimeout(800);
+      w = await where();
+      expect(w.top > 20, `第一段往上滚，页面没滚回上一节（轨道顶离视口顶 ${Math.round(w.top)}）`);
     },
   },
   {
@@ -361,7 +408,7 @@ export const CHECKS = [
       const mounted = await page.evaluate(() => document.querySelector('[data-lock]').dataset.lockScene ?? null);
       expect(mounted !== null, '刷新后四秒多了，画面还没挂上');
 
-      // 地址带着锚点（点过「看一趟怎么跑」）再刷新：浏览器恢复到刷新前的位置，不能被拉回这一节的开头。
+      // 地址带着锚点（从别处点链接进来）再刷新：浏览器恢复到刷新前的位置，不能被拉回这一节的开头。
       // WebKit 不核：Safari 刷新带锚点的地址时自己就滚去锚点、不恢复原来的位置（查过，页面的脚本没有动滚动），
       // 那是这个浏览器的行为，在它上面所有网站都这样。
       if (engine === 'webkit') return;
@@ -555,6 +602,7 @@ export const CHECKS = [
       const attempts = await page.$$eval('button[data-attempt]', (els) => els.map((el) => ({ id: el.dataset.attempt, gate: el.dataset.gateRef })));
       expect(attempts.length === 6, `办法有 ${attempts.length} 个`);
       let lit = 0;
+      const heights = new Set();
       for (const attempt of attempts) {
         await page.click(`button[data-attempt="${attempt.id}"]`);
         await page.waitForTimeout(250);
@@ -562,12 +610,19 @@ export const CHECKS = [
         const state = await page.evaluate(() => ({
           out: document.querySelector('[data-breach-out]').textContent,
           lit: document.querySelectorAll('[data-gate][data-lit]').length,
+          // 说明框看得见时（宽屏版式）它的高度；用户说「这块元素的高度随着 tab 的切换不要变」
+          box: (() => {
+            const wrap = document.querySelector('.breach__out-wrap');
+            return wrap && getComputedStyle(wrap).display !== 'none' ? Math.round(wrap.getBoundingClientRect().height) : null;
+          })(),
         }));
+        if (state.box !== null) heights.add(state.box);
         expect(state.out.includes(t.breach.gates[attempt.gate].name), `点了 ${attempt.id}，右边没有出现「${t.breach.gates[attempt.gate].name}」`);
         expect(state.out.includes(t.breach.attempts[attempt.id].says), `点了 ${attempt.id}，右边不是它那句话`);
         expect(state.lit === lit, `点了 ${lit} 个，亮着的门禁是 ${state.lit} 个`);
         if (lit === 3) await shot('mid');
       }
+      expect(heights.size <= 1, `点不同的办法，说明框的高度在变：${[...heights].join('、')}`);
       expect(await page.isVisible('[data-breach-all]'), '六个都点完了，收尾那句没出来');
       await page.waitForTimeout(900);
       await shot('done');
@@ -818,8 +873,9 @@ export const CHECKS = [
     // 单栏和高屏版式里左边也对齐左边线）、宽屏和高屏版式里整个终端都在首屏以内、不横向溢出、字是 hero-demo.json 里的。
     name: 'hero-demo',
     viewports: ['360', '820', '1440', 'tall', 'tall-narrow'],
-    async run({ page, context, url, viewport, shot }) {
-      const demo = JSON.parse(await readFile(path.join(ROOT, 'src', 'copy', 'hero-demo.json'), 'utf8'));
+    async run({ page, context, url, viewport, shot, lang }) {
+      const demoFile = lang.code === 'zh' ? 'hero-demo.json' : `hero-demo.${lang.code}.json`;
+      const demo = JSON.parse(await readFile(path.join(ROOT, 'src', 'copy', demoFile), 'utf8'));
       // 版式不跳：同一个页面开两次比。一次让演示的脚本一直不回来（只有样式里留好的位置），一次正常挂上。
       // 按布局位置比（offsetTop 一路加上去），不算 transform：挂上之前演示带着入场的 translateY(12px)。
       // 都等网页字体换好再量：英文页 360 宽时字体换上那一下副标题少一行，那是另一回事，原来就有。
@@ -880,7 +936,7 @@ export const CHECKS = [
       });
       expect(!m.noDemo && m.win, '演示没挂上（hero 上标了 hero--no-demo，或者找不到终端窗口）');
       expect(!m.markShown, '演示挂上了，图标的三片还显示着');
-      expect(m.text.includes(demo.allDone), `终端里没有「${demo.allDone}」，文案不是从 hero-demo.json 来的？`);
+      expect(m.text.includes(demo.allDone), `终端里没有「${demo.allDone}」，文案不是从 ${demoFile} 来的？`);
       // 终端是一扇完整的窗口：右边对齐内容区的右边线，不出画、不贴屏幕边
       expect(Math.abs(m.win.right - m.lineRight) <= 2, `终端的右边 ${Math.round(m.win.right)} 没对齐内容区的右边线 ${Math.round(m.lineRight)}`);
       expect(m.win.right < m.vw, `终端的右边 ${Math.round(m.win.right)} 跑出了屏幕（${m.vw}）`);

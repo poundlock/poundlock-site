@@ -47,14 +47,15 @@ export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version
   }
 
   const reefManifest = reef === undefined ? await loadReef() : reef;
-  // 首屏演示里终端的字：插件本身是中文的，中英两页用同一份
-  const heroDemo = await loadCopy('hero-demo');
+  // 首屏演示里终端的字：中文页用 hero-demo.json，别的语言用 hero-demo.<语言>.json（没有就用中文那份）
+  const heroDemoZh = await loadCopy('hero-demo');
+  const heroDemoOf = async (code) => (code === 'zh' || !existsSync(path.join(SRC, 'copy', `hero-demo.${code}.json`)) ? heroDemoZh : loadCopy(`hero-demo.${code}`));
   const pages = [];
   for (const lang of config.langs) {
     const ctx = {
       lang,
       t: await loadCopy(lang.code),
-      heroDemo,
+      heroDemo: await heroDemoOf(lang.code),
       base: lang.path ? '../'.repeat(lang.path.split('/').filter(Boolean).length) : '',
       config: { ...config, siteUrl },
       version,

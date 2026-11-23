@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FADE_FROM, FADE_TO, beatAt, fadeProgress, progressOf } from '../src/scripts/lock.js';
+import { readFileSync } from 'node:fs';
+import { FADE_FROM, FADE_TO, beatAt, fadeProgress, nextStop, progressOf, stopsOf } from '../src/scripts/lock.js';
 import { geometry, renderScene } from '../src/sections/lock-scene.js';
 
 test('beatAt', () => {
@@ -96,4 +97,32 @@ test('fadeProgress：只在收尾那两处淡入淡出起作用的那一段（0.
     assert.equal(water(fadeProgress(p)), water(p), `水面那一层在 ${p}`);
     assert.equal(after(fadeProgress(p)), after(p), `升上来的那层在 ${p}`);
   }
+});
+
+test('stopsOf：滚轮一格走一段，停点一段一个、从 0 到 1 递增，每个都落在自己那一拍里', () => {
+  const reef = JSON.parse(readFileSync(new URL('../src/assets/reef/manifest.json', import.meta.url), 'utf8'));
+  for (const stops of [stopsOf(reef), stopsOf(null)]) {
+    assert.equal(stops.length, 8);
+    assert.equal(stops[0], 0);
+    assert.equal(stops[7], 1);
+    stops.forEach((p, i) => assert.equal(beatAt(p), i));
+  }
+  // 有清单时停在每段场景的正中：镜头中心对着第 k 段中间
+  const s = stopsOf(reef);
+  const x = reef.xStart + s[3] * (reef.xEnd - reef.xStart);
+  assert.ok(Math.abs(x - 3.5 * reef.sceneLen) < 1e-9);
+});
+
+test('nextStop：往下去下一个停点、往上去上一个；两头再滚是 null（照常滚出这一节）', () => {
+  const stops = stopsOf(null);
+  assert.equal(nextStop(stops, 0, 1), stops[1]);
+  assert.equal(nextStop(stops, stops[3], 1), stops[4]);
+  assert.equal(nextStop(stops, stops[3], -1), stops[2]);
+  // 停在两个停点中间：往哪边滚就去哪边最近的那个
+  assert.equal(nextStop(stops, (stops[3] + stops[4]) / 2, 1), stops[4]);
+  assert.equal(nextStop(stops, (stops[3] + stops[4]) / 2, -1), stops[3]);
+  assert.equal(nextStop(stops, 1, 1), null);
+  assert.equal(nextStop(stops, 0, -1), null);
+  // 差一点点到停点也算到了，不会原地再滑一次
+  assert.equal(nextStop(stops, stops[2] - 0.001, 1), stops[3]);
 });

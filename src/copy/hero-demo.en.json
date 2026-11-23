@@ -1,0 +1,71 @@
+{
+  "title": "shop — claude",
+  "draftLabel": "Requirement draft",
+  "approve": "Start from this draft",
+  "revise": "Revise it",
+  "answered": "Requirement draft",
+  "gate": "Gate",
+  "verdictWho": "Acceptance",
+  "verdict": "Verdict: pass",
+  "allDone": "All eight stages done",
+  "reqs": [
+    {
+      "command": "/poundlock:at add CSV export to the order list",
+      "draft": "Add an “Export CSV” button to the order list that exports the current filter",
+      "writer": "Backend",
+      "owner": "Frontend",
+      "file": "web/src/OrderList.tsx",
+      "gateSays": "Backend may not write this file: the path is not one it claimed."
+    },
+    {
+      "command": "/poundlock:at add a notes field to refunds",
+      "draft": "Add “Notes” to refunds: support fills it in, the refund record shows it",
+      "writer": "Frontend",
+      "owner": "Backend",
+      "file": "server/refund/model.ts",
+      "gateSays": "Frontend may not write this file: the path is not one it claimed."
+    }
+  ],
+  "stages": [
+    {
+      "id": "S1",
+      "name": "Contract",
+      "who": "Project manager"
+    },
+    {
+      "id": "S2",
+      "name": "Product design",
+      "who": "Product, UI"
+    },
+    {
+      "id": "S3",
+      "name": "Technical plan",
+      "who": "Architect"
+    },
+    {
+      "id": "S4",
+      "name": "Dispatch decision",
+      "who": "Project manager"
+    },
+    {
+      "id": "S5",
+      "name": "Implementation",
+      "who": "Frontend, Backend"
+    },
+    {
+      "id": "S6",
+      "name": "Testing",
+      "who": "Testing role"
+    },
+    {
+      "id": "S7",
+      "name": "Business acceptance",
+      "who": "Acceptance role"
+    },
+    {
+      "id": "S8",
+      "name": "Delivery",
+      "who": "Project manager"
+    }
+  ]
+}

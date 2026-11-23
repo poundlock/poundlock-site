@@ -11,6 +11,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...parts) => readFileSync(path.join(ROOT, ...parts), 'utf8');
 const demo = JSON.parse(read('src', 'copy', 'hero-demo.json'));
 const zh = JSON.parse(read('src', 'copy', 'zh.json'));
+// 英文页的演示另有一份（终端里的字也是英文的）
+const demoEn = JSON.parse(read('src', 'copy', 'hero-demo.en.json'));
+const en = JSON.parse(read('src', 'copy', 'en.json'));
 const config = { repoUrl: 'https://github.com/poundlock/poundlock-skills' };
 
 test('首屏演示的八段和官网的阶段、角色对得上', () => {
@@ -34,16 +37,37 @@ test('首屏演示的两条需求：被拦的和改写的是实现那一段的�
   assert.notEqual(demo.reqs[0].command, demo.reqs[1].command, '两条需求一样，循环时会重复敲同一条命令');
 });
 
+test('英文页的演示：八段、角色和英文页过闸那一节的叫法一样，两条需求的结构和中文那份一样', () => {
+  assert.deepEqual(demoEn.stages.map((s) => s.id), facts.stages.map((s) => s.id));
+  for (const stage of demoEn.stages) {
+    assert.equal(stage.name, en.lock.stages[stage.id].name, `${stage.id} 的名字和英文页过闸那一节的不一样`);
+    const allowed = facts.stages.find((s) => s.id === stage.id).roles.map((role) => en.lock.roles[role].name);
+    for (const who of stage.who.split(', ')) assert.ok(allowed.includes(who), `${stage.id} 写的「${who}」不是这一段的角色`);
+  }
+  const implementers = facts.stages.find((s) => s.id === 'S5').roles.map((role) => en.lock.roles[role].name);
+  assert.equal(demoEn.reqs.length, 2);
+  for (const req of demoEn.reqs) {
+    assert.ok(req.command.startsWith('/poundlock:at '));
+    assert.ok(implementers.includes(req.writer) && implementers.includes(req.owner));
+    assert.notEqual(req.writer, req.owner);
+    assert.ok(req.gateSays.startsWith(req.writer));
+  }
+  assert.deepEqual(Object.keys(demoEn).sort(), Object.keys(demo).sort(), '英文那份和中文那份的键不一样');
+  // 英文页不带中文字体：英文那份里不能有中文字
+  assert.ok(!/[一-鿿]/.test(JSON.stringify(demoEn)), '英文页的演示里还有中文');
+});
+
 test('首屏演示的文案没有空的', () => {
   const walk = (value, at) => {
     if (typeof value === 'string') return assert.ok(value.trim().length > 0, `${at} 是空的`);
     for (const [key, item] of Object.entries(value)) walk(item, `${at}.${key}`);
   };
   walk(demo, 'hero-demo');
+  walk(demoEn, 'hero-demo.en');
 });
 
 test('首屏：有演示的文案就留演示的位置，文案原样写在 data-demo-copy 里（data-copy 是复制按钮用的）；没有就退回图标，不留空位', () => {
-  const t = { hero: { h1: '十个角色，按顺序把你的需求做完', sub: '副标题', note: '', ctaStar: '点星', ctaDemo: '看一趟' } };
+  const t = { hero: { h1: '十个角色，按顺序把你的需求做完', sub: '副标题', note: '', ctaStar: '点星' } };
   const page = String(render({ t, config, heroDemo: demo }));
   const attr = page.match(/data-demo-copy="([^"]*)"/);
   assert.ok(attr, '没有 data-demo-copy');

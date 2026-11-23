@@ -97,8 +97,15 @@ def make_body(rings=200, around=72):
             v[k] = (x, y * (1 - f), zc + (z - zc) * (1 - f * 0.6))
             region[k] = 1
         elif gill_edge(z) + 0.006 < x < GILL_HINGE - 0.01 and abs(z - zc) < 0.72 * hz:
-            v[k] = (x, y * 0.97, z)
-            region[k] = 2
+            # 只在鳃盖后半截底下往里收，往铰那边、往上下两头都慢慢收回到原样：表面上没有台阶
+            near_hinge = min(1.0, max(0.0, (GILL_HINGE - 0.012 - x) / 0.05))
+            edge_z = 1.0 - min(1.0, max(0.0, (abs(z - zc) / (0.72 * hz) - 0.75) / 0.25))
+            push = 0.03 * near_hinge * near_hinge * (3 - 2 * near_hinge) * edge_z
+            v[k] = (x, y * (1 - push), z)
+            # 真正收进去的那一块才用鳃丝的颜色（鳃盖掀开时露出来的就是这里）；贴着铰、贴着上下两头的照样是皮肤，
+            # 鳃盖掀开时那两头的边会往里沉一点，底下露出来的也是皮肤，看不出缝
+            if push > 0.018:
+                region[k] = 2
     mesh.vertices.foreach_set("co", v.ravel())
     mesh.update()
     obj = bpy.data.objects.new("fish_body", mesh)
@@ -152,7 +159,7 @@ def make_jaw():
             # 从一侧的嘴裂往下绕过腹面到另一侧的嘴裂
             a0 = math.asin(max(-1.0, min(1.0, (top - zc) / (hz * 0.97))))
             a = PI - a0 + (PI + 2 * a0) * j / 28
-            grow = 0.985 + 0.021 * min(1.0, max(0.0, (x - MOUTH_X + 0.02) / 0.05))
+            grow = 1.003 + 0.003 * min(1.0, max(0.0, (x - MOUTH_X + 0.02) / 0.05))
             px, py, pz = section_point(x, a, grow)
             ring.append((px, py, pz))
         sections.append(ring)
@@ -168,23 +175,30 @@ def make_operculum(side):
     """鳃盖：一片贴着鳃部的壳，前缘是铰（挂在鳃盖骨上），后缘一道弧，呼吸时往外掀。"""
     hz, hy, zc = profile(0.26)
     rows = []
+    rest = []
     for i in range(18):
         t = i / 17
         row = []
         for j in range(22):
-            zz = zc + (j / 21 * 2 - 1) * 0.74 * hz
+            zn = j / 21 * 2 - 1
+            zz = zc + zn * 0.74 * hz
             x = gill_edge(zz) - 0.004 + t * (GILL_HINGE - gill_edge(zz) + 0.004)
             hzx, hyx, zcx = profile(x)
             a = math.asin(max(-1.0, min(1.0, (zz - zcx) / (hzx * 0.97))))
-            px, py, pz = section_point(x, a, 1.018 - 0.02 * t ** 1.5)
+            ends = min(1.0, max(0.0, (abs(zn) - 0.7) / 0.3))
+            lift = (1 - t) ** 1.6 * (1 - 0.85 * ends * ends * (3 - 2 * ends))
+            px, py, pz = section_point(x, a, 1.003 + 0.015 * lift)
             row.append((px, side * abs(py), zz))
+            bx, by, bz = section_point(x, a, 1.0)
+            rest.append((bx, side * abs(by), zz))
         rows.append(row)
     mesh = loft(f"fish_operculum_{'L' if side > 0 else 'R'}", rows)
     attr = mesh.attributes.new("op_t", "FLOAT", "POINT")
     attr.data.foreach_set("value", np.asarray([i / 17 for i in range(18) for _ in range(22)], dtype=np.float32))
     obj = bpy.data.objects.new(mesh.name, mesh)
     bpy.context.scene.collection.objects.link(obj)
-    store_rest(mesh)
+    rest_attr = mesh.attributes.new("rest", "FLOAT_VECTOR", "POINT")
+    rest_attr.data.foreach_set("vector", np.asarray(rest, dtype=np.float32).ravel())
     smooth(mesh)
     return obj
 
@@ -340,8 +354,8 @@ def operculum_material():
     bsdf = next(n for n in tree.nodes if n.type == "BSDF_PRINCIPLED")
     base_link = bsdf.inputs["Base Color"].links[0].from_socket
     t = g.attr("op_t")
-    seam = g.smooth(t, 0.12, 0.0)
-    color = g.mix(g.math("MULTIPLY", seam, 0.85), base_link, (0.01, 0.015, 0.018))
+    seam = g.smooth(t, 0.09, 0.0)
+    color = g.mix(g.math("MULTIPLY", seam, 0.6), base_link, (0.01, 0.015, 0.018))
     g.put(bsdf, "Base Color", color)
     return mat
 

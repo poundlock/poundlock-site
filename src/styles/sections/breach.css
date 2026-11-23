@@ -222,10 +222,39 @@
   fill: var(--fg);
 }
 
+/* 说明框和量高度的那一叠（breach.js 加的）叠在同一个格子里：框的高度就是最长那句的高度 */
+.breach[data-breach-live] .breach__out-wrap {
+  display: grid;
+}
+
+.breach[data-breach-live] .breach__out-wrap > * {
+  grid-area: 1 / 1;
+}
+
+.breach__out-sizer {
+  display: grid;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.breach__out-sizer > .breach__out-size {
+  grid-area: 1 / 1;
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid transparent;
+  font-size: var(--text-3);
+  line-height: 1.65;
+}
+
+.breach__out-size .breach__gate-name {
+  font-size: var(--text-4);
+}
+
 .breach[data-breach-live] .breach__out {
   display: grid;
   gap: var(--space-2);
-  min-height: 8.5em;
   align-content: start;
   padding: var(--space-3) var(--space-4);
   border-left: 4px solid var(--accent);
@@ -238,6 +267,12 @@
 .breach[data-breach-live] .breach__out:empty {
   border-left-color: var(--line);
   background: transparent;
+}
+
+/* 还没点：框里写一句往哪儿点（data-pick），不然右下只有一道竖线，像没加载出来 */
+.breach[data-breach-live] .breach__out:empty::before {
+  content: attr(data-pick);
+  color: var(--muted);
 }
 
 .breach__out .breach__gate-name {
@@ -280,7 +315,8 @@
     max-height: 150px;
   }
 
-  .breach[data-breach-live] .breach__out {
+  .breach[data-breach-live] .breach__out,
+  .breach[data-breach-live] .breach__out-wrap {
     display: none;
   }
 

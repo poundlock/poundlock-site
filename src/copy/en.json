@@ -11,8 +11,7 @@
     "h1": "Ten roles finish your requirement, in order",
     "sub": "poundlock is a Claude Code plugin. You talk to one project manager; whether each step is really done is checked by gates, not claimed by the AI.",
     "ctaStar": "Star on GitHub",
-    "ctaDemo": "Watch a run",
-    "note": "The plugin itself runs in Chinese."
+    "note": "The plugin itself speaks Chinese; the session on the right is translated."
   },
   "pain": {
     "title": "Three things that happen when the AI just writes",
@@ -33,7 +32,6 @@
   },
   "lock": {
     "title": "One requirement, eight locks",
-    "lead": "A pound lock is a canal lock: the boat enters the chamber, the gate closes behind it, the water rises one level, and only then can it move on. Until a stage has handed over everything it owes, the next gate stays shut.",
     "ledgerTitle": "What each stage leaves behind",
     "parallelNote": "Roles in the same stage work in parallel",
     "stages": {
@@ -114,8 +112,8 @@
     }
   },
   "breach": {
-    "title": "Want to cut a corner? Try it",
-    "lead": "Here are six common shortcuts. Pick one and watch the gate close.",
+    "title": "Six gates",
+    "lead": "Six common shortcuts, each stopped in code by one gate.",
     "demoBadge": "Demo: a replay of the plugin’s real behavior, not a live run. The real messages are in Chinese.",
     "allTried": "All six gates are code that blocks the call, not a line in a prompt asking the AI to behave.",
     "attempts": {
@@ -169,7 +167,8 @@
         "name": "Rework budget",
         "what": "Three rework rounds at most. After that it has to ask you."
       }
-    }
+    },
+    "pick": "Pick a shortcut to see which gate stops it."
   },
   "contract": {
     "title": "Acceptance checks against your own words",

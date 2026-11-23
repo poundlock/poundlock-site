@@ -52,7 +52,8 @@ test('定下来的首屏文案', () => {
   assert.equal(zh.hero.note, '');
   // 标题末尾不带句号（和中文那句一致）：通扫时去掉的，字没动。
   assert.equal(en.hero.h1, 'Ten roles finish your requirement, in order');
-  assert.equal(en.hero.note, 'The plugin itself runs in Chinese.');
+  // 英文页的首屏演示换成了英文（2026-11-23），这句说清插件本身是中文的、右边那段是翻译过的
+  assert.equal(en.hero.note, 'The plugin itself speaks Chinese; the session on the right is translated.');
 });
 
 test('文案红线', () => {

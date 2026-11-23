@@ -29,6 +29,25 @@ export function initBreach(root, anime, { reduced = false } = {}) {
   const state = createBreachState(buttons.map((button) => button.dataset.attempt));
   const still = reduced || !anime;
 
+  // 说明框的高度：六句话的副本叠在同一个格子里、看不见（读屏也跳过），框跟着最长的那句撑开，
+  // 点不同的办法时整块不会忽高忽低（用户说「这块元素的高度随着 tab 的切换不要变」）。
+  const doc = root.ownerDocument;
+  const wrap = doc.createElement('div');
+  wrap.className = 'breach__out-wrap';
+  const sizer = doc.createElement('div');
+  sizer.className = 'breach__out-sizer';
+  sizer.setAttribute('aria-hidden', 'true');
+  for (const button of buttons) {
+    const says = root.querySelector(`[data-says-for="${button.dataset.attempt}"]`);
+    if (!says) continue;
+    const item = doc.createElement('div');
+    item.className = 'breach__out-size';
+    item.append(...[...says.childNodes].map((node) => node.cloneNode(true)));
+    sizer.append(item);
+  }
+  out.parentNode.insertBefore(wrap, out);
+  wrap.append(out, sizer);
+
   const boat = scene && scene.querySelector('.breach__boat');
   const gate = scene && scene.querySelector('.breach__gate');
   const ring = scene && scene.querySelector('.breach__ring');

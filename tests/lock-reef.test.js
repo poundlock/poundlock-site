@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { momentumStep, MOMENTUM_RISE, MOMENTUM_FALL, REEF_FOLLOW, cameraX, presence, visibleTiles, aboveAt, effectsAt, waterAt, readReef } from '../src/scripts/lock-reef.js';
+import { momentumStep, MOMENTUM_RISE, MOMENTUM_FALL, REEF_FOLLOW, cameraX, presence, visibleTiles, aboveAt, effectsAt, waterAt, readReef, createFishBehavior } from '../src/scripts/lock-reef.js';
 import { FOLLOW } from '../src/scripts/lock.js';
 
 const DT = 1 / 120;
@@ -114,4 +114,21 @@ test('仓库里的清单和 tools/reef/journey.py 的排法、文件对得上', 
   }
   assert.ok(existsSync('src/assets/reef/back.webp'));
   for (const act of ['idle', 'swim']) assert.ok(existsSync(`src/assets/reef/fish/${act}.webp`));
+});
+
+test('鱼游来游去、窜来窜去，不越过左边那条线（宽屏上说明那一栏的右边），也不越过右边', () => {
+  for (const seed of [3, 7, 11]) {
+    const step = createFishBehavior(seed);
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (let i = 0; i < 60 * 120; i++) {
+      const pose = step(1 / 60, { momentum: i % 900 < 60 ? -0.08 : 0, aspect: 1.25, left: 0.11 });
+      if (i > 120) {
+        minX = Math.min(minX, pose.x);
+        maxX = Math.max(maxX, pose.x);
+      }
+    }
+    assert.ok(minX >= 0.1, `种子 ${seed}：鱼游到了 ${minX.toFixed(3)}，越过了左边 0.11`);
+    assert.ok(maxX <= 0.33, `种子 ${seed}：鱼游到了 ${maxX.toFixed(3)}，出了右边`);
+  }
 });

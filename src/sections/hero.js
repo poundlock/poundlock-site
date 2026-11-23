@@ -32,12 +32,11 @@ export function render(ctx) {
     ${t.hero.note ? html`<p class="hero__note">${t.hero.note}</p>` : null}
     <div class="hero__cta">
       <a class="btn btn--primary" href="${config.repoUrl}" data-star data-fit>${starIcon}<span>${t.hero.ctaStar}</span><span class="star-count" data-star-count hidden></span></a>
-      <a class="btn btn--ghost" href="#lock" data-fit>${t.hero.ctaDemo}</a>
     </div>
   </div>
   <div class="hero__mark" aria-hidden="true">${mark}</div>
   <!-- 首屏演示：一个 Claude Code 会话里跑完一趟（tools/stage/ 里的 React 演示，事先打包好）。脚本挂上以后替掉上面的三片。
-       终端里的字从 data-demo-copy 传进去（src/copy/hero-demo.json）；没有这份文案就不放这个位置，页面一直是三片。 -->
+       终端里的字从 data-demo-copy 传进去（中文页 src/copy/hero-demo.json，英文页 hero-demo.en.json）；没有这份文案就不放这个位置，页面一直是三片。 -->
   ${heroDemo ? html`<div class="hero__demo" data-hero-demo data-demo-copy="${JSON.stringify(heroDemo)}" aria-hidden="true"></div>` : null}
 </section>`;
 }

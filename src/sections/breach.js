@@ -37,7 +37,7 @@ export function render(ctx) {
     </ul>
     <div class="breach__stage">
       <div class="breach__scene">${scene}</div>
-      <div class="breach__out" data-breach-out aria-live="polite"></div>
+      <div class="breach__out" data-breach-out data-pick="${t.breach.pick}" aria-live="polite"></div>
     </div>
     <ul class="breach__gates">
       ${gates.map(
