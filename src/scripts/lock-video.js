@@ -6,6 +6,8 @@
 
 import { frameAtTable } from './film-schedule.js';
 import { DAY_AT, coverRect } from './lock-film.js';
+import { FOLLOW } from './lock.js';
+import { styleWriter } from './style-writer.js';
 
 const ORDER = ['mid', 'wide', 'uhd']; // 从小到大；手机那一档单算
 const ENOUGH = 1.05; // 铺满画布时放大不超过这么多，就算这一档够用
@@ -135,6 +137,8 @@ const fromBase64 = (text) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0))
 export function mountVideo(root, canvas, film, { onFail } = {}) {
   const doc = root.ownerDocument;
   const win = doc.defaultView;
+  // 页头天亮没有：写在页头上（只有它读），值变了才写
+  const headerVars = styleWriter(doc.querySelector('[data-header]'));
   const supported = typeof win.VideoDecoder === 'function' && typeof win.EncodedVideoChunk === 'function' && typeof win.createImageBitmap === 'function';
   if (!supported || !film || !film.tiers || !Object.keys(film.tiers).length || !Array.isArray(film.progress)) return null;
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -501,7 +505,7 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
       const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
       last = now;
       const before = shown;
-      shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * 7));
+      shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * FOLLOW));
       if (before !== null && shown !== before) direction = shown > before ? 1 : -1;
       wanted = frameAtTable(table, shown);
       canvas.dataset.want = String(wanted);
@@ -512,8 +516,8 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
       }
       // 页头固定在最上面，压着这块画面：天亮以后画面顶上是亮的，它换成浅色段的样子。
       const day = shown >= DAY_AT;
-      root.toggleAttribute('data-day', day);
-      doc.documentElement.style.setProperty('--header-day', day ? '1' : '0');
+      if (root.hasAttribute('data-day') !== day) root.toggleAttribute('data-day', day);
+      headerVars.set('--header-day', day ? '1' : '0');
     },
     fill() {
       if (dead || filled) return;
@@ -525,7 +529,7 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
       close(session);
       session = null;
       win.removeEventListener('resize', onResize);
-      doc.documentElement.style.removeProperty('--header-day');
+      headerVars.clear('--header-day');
       root.removeAttribute('data-day');
       root.removeAttribute('data-lock-film-ready');
       delete canvas.dataset.frame;

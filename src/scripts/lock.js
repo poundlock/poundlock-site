@@ -7,6 +7,7 @@
 // beatAt、progressOf 是纯函数，Node 里能直接测。
 
 import { lockStateAt } from './lock-state.js';
+import { styleWriter } from './style-writer.js';
 import { mountFilm } from './lock-film.js';
 import { mountVideo } from './lock-video.js';
 import { STAGE_QUERY } from './stage.js';
@@ -24,6 +25,19 @@ export function progressOf(rect, viewportHeight) {
 }
 
 const BEATS = 8;
+
+// 画面追滚动位置的快慢（每秒的衰减率）：12 是时间常数 83ms 上下。影片帧密了以后不用再靠惯性抹平跳帧，
+// 再慢就和浏览器自己的平滑滚动叠在一起，画面要 0.3 秒以上才追上手。影片的两路播放器用同一个数。
+export const FOLLOW = 12;
+
+// 收尾那两处淡入淡出（lock.css：水面那一层退掉、底下那层亮色升上来）只在进度 0.95 到 0.9955 之间变，
+// 两头外面写进去的值都一样。--lock-progress 只写这一段里的值，这一段以外不用每帧写。
+export const FADE_FROM = 0.95;
+export const FADE_TO = 0.9955;
+
+export function fadeProgress(progress) {
+  return Math.min(FADE_TO, Math.max(FADE_FROM, progress));
+}
 
 // 画布上带着影片的清单（生成页面时写进去的）；没带、或者写坏了，就是没有影片。
 function readFilm(canvas) {
@@ -43,6 +57,7 @@ function mountFlat(root, anime) {
   const svg = waterLayer && waterLayer.querySelector('.lock__svg');
   const stage = root.querySelector('.lock__stage');
   if (!svg || !stage) return null;
+  const stageVars = styleWriter(stage);
 
   const BEAT = 1000; // 时间线上一拍的长度
   const { createTimeline } = anime;
@@ -81,7 +96,7 @@ function mountFlat(root, anime) {
     boat.style.transform = `translate(${state.boatX.toFixed(2)}px, ${state.boatY.toFixed(2)}px)`;
     float.style.transform = `translateY(${state.boatY.toFixed(2)}px)`;
     for (const lane of lanes) lane.style.opacity = (state.lanes * 0.5).toFixed(3);
-    stage.style.setProperty('--surface', state.surface.toFixed(4));
+    stageVars.set('--surface', state.surface.toFixed(4));
   };
 
   const timeline = createTimeline({ defaults: { ease: 'linear' }, autoplay: false });
@@ -117,14 +132,14 @@ function mountFlat(root, anime) {
     frame(progress, now, snap = false) {
       const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
       last = now;
-      shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * 7));
+      shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * FOLLOW));
       timeline.seek(shown * BEATS * BEAT);
       render();
     },
     destroy() {
       if (timeline.revert) timeline.revert();
       for (const element of [...slabs.map((slab) => slab.water), ...Object.values(gateOf), ...lanes, boat, float]) element.removeAttribute('style');
-      stage.style.removeProperty('--surface');
+      stageVars.clear('--surface');
     },
   };
 }
@@ -167,14 +182,19 @@ function openStage(root, anime) {
   const chambers = [...root.querySelectorAll('[data-stage]')];
   const tags = [...root.querySelectorAll('[data-ledger-beat]')];
 
+  // --lock-progress 写在这一节上（只有收尾那两处淡入淡出读它）；--rise 写在页头上（只有页头读它，
+  // 写在 <html> 上会让整页每帧重算样式）。都是值变了才写。
+  const rootVars = styleWriter(root);
+  const headerVars = styleWriter(doc.querySelector('[data-header]'));
+
   // 这一拍、这一段的文字、账本里已经落下的产物：直接跟着滚动位置走。
   let progress = 0;
   let shownBeat = -1;
   const apply = () => {
     progress = progressOf(track.getBoundingClientRect(), win.innerHeight);
     const beat = beatAt(progress, BEATS);
-    root.style.setProperty('--lock-progress', progress.toFixed(4));
-    doc.documentElement.style.setProperty('--rise', progress.toFixed(4));
+    rootVars.set('--lock-progress', fadeProgress(progress).toFixed(4));
+    headerVars.set('--rise', progress.toFixed(4));
     if (beat === shownBeat) return;
     shownBeat = beat;
     root.dataset.beat = String(beat);
@@ -294,8 +314,8 @@ function openStage(root, anime) {
       delete root.dataset.lockScene;
       delete root.dataset.beat;
       root.removeAttribute('data-lock-film');
-      root.style.removeProperty('--lock-progress');
-      doc.documentElement.style.removeProperty('--rise');
+      rootVars.clear('--lock-progress');
+      headerVars.clear('--rise');
       chambers.forEach((chamber) => chamber.removeAttribute('data-current'));
       tags.forEach((tag) => {
         tag.removeAttribute('data-in');

@@ -504,7 +504,7 @@ export const CHECKS = [
       await page.waitForTimeout(600);
       const state = await page.evaluate(() => ({
         beat: document.querySelector('[data-lock]').dataset.beat,
-        rise: Number(getComputedStyle(document.documentElement).getPropertyValue('--rise')),
+        rise: Number(getComputedStyle(document.querySelector('[data-header]')).getPropertyValue('--rise')),
       }));
       expect(state.beat === '4', `刷新后 data-beat 是 ${state.beat}，应当是 4`);
       expect(state.rise > 0.5 && state.rise < 0.7, `刷新后 --rise 是 ${state.rise}`);
@@ -543,7 +543,7 @@ export const CHECKS = [
       await page.goto(`${url}#install`, { waitUntil: 'load' });
       await page.waitForSelector('[data-lock][data-lock-live]', { timeout: 8000 });
       await page.waitForTimeout(600);
-      const rise = await page.evaluate(() => Number(getComputedStyle(document.documentElement).getPropertyValue('--rise')));
+      const rise = await page.evaluate(() => Number(getComputedStyle(document.querySelector('[data-header]')).getPropertyValue('--rise')));
       expect(rise === 1, `从 #install 进来时 --rise 是 ${rise}`);
     },
   },

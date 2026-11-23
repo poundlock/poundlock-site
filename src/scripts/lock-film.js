@@ -4,6 +4,8 @@
 // 这一路现在是后备：浏览器能用显卡解视频时走 lock-video.js，走不了才用这里的图片。
 
 import { frameAtTable, subsample } from './film-schedule.js';
+import { FOLLOW } from './lock.js';
+import { styleWriter } from './style-writer.js';
 
 // 进度（0 到 1）对应第几帧。
 export function frameAt(progress, count) {
@@ -80,6 +82,8 @@ export const DAY_AT = 0.955;
 export function mountFilm(root, canvas, film, { onFail } = {}) {
   const doc = root.ownerDocument;
   const win = doc.defaultView;
+  // 页头天亮没有：写在页头上（只有它读），值变了才写
+  const headerVars = styleWriter(doc.querySelector('[data-header]'));
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx || !film || !film.sets) return null;
 
@@ -210,15 +214,15 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
       // 第一帧直接到位（刷新、带锚点进来时不从头演一遍）；之后带着惯性追。
       const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
       last = now;
-      shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * 7));
+      shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * FOLLOW));
       wanted = indexAt(shown);
       canvas.dataset.want = String(wanted);
       hurry(now);
       paint(false);
       // 页头固定在最上面，压着这块画面：天亮以后画面顶上是亮的，它换成浅色段的样子。
       const day = shown >= DAY_AT;
-      root.toggleAttribute('data-day', day);
-      doc.documentElement.style.setProperty('--header-day', day ? '1' : '0');
+      if (root.hasAttribute('data-day') !== day) root.toggleAttribute('data-day', day);
+      headerVars.set('--header-day', day ? '1' : '0');
     },
     fill() {
       if (dead || filled) return;
@@ -233,7 +237,7 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
       queue = [];
       rest = [];
       win.removeEventListener('resize', onResize);
-      doc.documentElement.style.removeProperty('--header-day');
+      headerVars.clear('--header-day');
       root.removeAttribute('data-day');
       root.removeAttribute('data-lock-film-ready');
       delete canvas.dataset.frame;

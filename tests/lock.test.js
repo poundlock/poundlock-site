@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { beatAt, progressOf } from '../src/scripts/lock.js';
+import { FADE_FROM, FADE_TO, beatAt, fadeProgress, progressOf } from '../src/scripts/lock.js';
 import { geometry, renderScene } from '../src/sections/lock-scene.js';
 
 test('beatAt', () => {
@@ -78,4 +78,22 @@ test('场景的 SVG 里八个闸室都在，并带着脚本要读的数', () => 
   assert.ok(svg.includes(`data-start-x="${geometry.startX}"`));
   assert.ok(svg.includes(`data-empty="${geometry.empty}"`));
   assert.ok(!/https?:\/\/(?!www\.w3\.org)/.test(svg), '场景里不该有外部地址');
+});
+
+test('fadeProgress：只在收尾那两处淡入淡出起作用的那一段（0.95 到 0.9955）里变，两头夹住', () => {
+  // lock.css 里水面那一层的透明度在 0.952 以前一直是 1、0.985 以后一直是 0；
+  // 底下升上来的那层亮色在 0.95 以前一直是 0、0.9955 以后一直是 1。这一段以外写进去的值都一样，不用每帧写。
+  assert.equal(fadeProgress(0), FADE_FROM);
+  assert.equal(fadeProgress(0.5), FADE_FROM);
+  assert.equal(fadeProgress(0.95), 0.95);
+  assert.equal(fadeProgress(0.97), 0.97);
+  assert.equal(fadeProgress(0.9955), 0.9955);
+  assert.equal(fadeProgress(1), FADE_TO);
+  // 夹住的两头算出来的透明度，和不夹时一样
+  const water = (p) => Math.min(1, Math.max(0, (0.985 - p) * 30));
+  const after = (p) => Math.min(1, Math.max(0, (p - 0.95) * 22));
+  for (const p of [0, 0.3, 0.94, 0.999, 1]) {
+    assert.equal(water(fadeProgress(p)), water(p), `水面那一层在 ${p}`);
+    assert.equal(after(fadeProgress(p)), after(p), `升上来的那层在 ${p}`);
+  }
 });
