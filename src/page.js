@@ -11,7 +11,7 @@ import * as install from './sections/install.js';
 import { STAGE_QUERY } from './scripts/stage.js';
 import * as footer from './sections/footer.js';
 
-// ctx = { lang, t, base, config, version, film }
+// ctx = { lang, t, base, config, version, reef }
 //   lang    config.langs 里的一项
 //   t       这门语言的文案
 //   base    到站点根的相对前缀：中文页 ''，英文页 '../'

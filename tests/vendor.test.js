@@ -17,7 +17,7 @@ test('anime.js 是锁定的那一版', () => {
 });
 
 test('实时三维撤掉以后，three.js 不在仓库里，也没有脚本引它', () => {
-  // 过闸改成了离线渲染的影片（lock-film.js），那七百多 KB 的三维库不该再跟着页面走。
+  // 过闸改成了离线渲好的长条图（lock-reef.js，自己写的 WebGL），那七百多 KB 的三维库不该再跟着页面走。
   assert.ok(!existsSync(path.resolve(DIR, '..', 'three')), 'src/vendor/three 还在');
   const scripts = path.resolve(DIR, '..', '..', 'scripts');
   for (const name of readdirSync(scripts)) {

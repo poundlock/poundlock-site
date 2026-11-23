@@ -455,7 +455,7 @@
   }
 }
 
-/* ---------- 影片版的过闸（lock.js 接上影片时，在这一节上标 data-lock-film） ---------- */
+/* ---------- 画布版的过闸（lock.js 接上 lock-reef.js 的画面时，在这一节上标 data-lock-film） ---------- */
 
 .lock__canvas {
   display: none;
@@ -467,10 +467,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  /* 画面的中心（船和它前面的闸门）落在画布的哪：左边要让给字，所以往右挪。lock-film.js 读这两个数。 */
-  --film-x: 0.61;
-  --film-y: 0.5;
-  /* 第一帧到了再显出来，不闪一下空画布。 */
+  /* 眼前那几块长条图到了再显出来，不闪一下空画布。 */
   opacity: 0;
   transition: opacity 600ms ease;
 }
@@ -479,7 +476,7 @@
   opacity: 1;
 }
 
-/* 平面那张图用的东西都收起来：水面以上那一层、那道波、图本身。图的位置留着，影片从那里透出来。 */
+/* 平面那张图用的东西都收起来：水面以上那一层、那道波、图本身。图的位置留着，画布从那里透出来。 */
 .js.stage-ok .lock[data-lock-film] .lock__air,
 .js.stage-ok .lock[data-lock-film] .lock__wave {
   display: none;
@@ -493,8 +490,8 @@
   background: var(--bg);
 }
 
-/* 影片从这一节的底色里淡出来，画布的上沿不是横着一刀切。这层渐变挂在标题下面、跟着标题一起滚：
-   舞台刚粘住时它还盖着画面上面一截（远处的闸和天光是一点点露出来的），再往下滚三成屏它就滚出了视口，不用脚本。
+/* 画面从这一节的底色里淡出来，画布的上沿不是横着一刀切。这层渐变挂在标题下面、跟着标题一起滚：
+   舞台刚粘住时它还盖着画面上面一截（远处的水是一点点露出来的），再往下滚三成屏它就滚出了视口，不用脚本。
    左右铺满这一节：标题本身不定位，渐变的参照就是这一节（左右 0 是整节宽）；不写 top，竖着落在它原本的位置
    （标题的字下面），再往下挪标题的下边距，正好是画布的上沿。不用 100vw：它把滚动条也算进去，会撑出横向滚动条。 */
 .js.stage-ok .lock[data-lock-film] .lock__head::after {
@@ -511,8 +508,7 @@
 }
 
 /* 字压在画面上：左边和底下各垫一层往画面里淡出去的暗色，字才读得清。
-   画面两侧一直是暗的（夜里是岸，天亮了是逆光的树林），所以字从头到尾用浅色，不跟着天亮换。
-   快到头的时候字淡出去，让位给下面那层升上来的亮色。 */
+   水下一路都偏暗，所以字从头到尾用浅色；快到头（出水）的时候字和暗色一起淡出去，让出水面以上的画面。 */
 .js.stage-ok .lock[data-lock-film] .lock__water {
   clip-path: none;
   background:
@@ -521,14 +517,16 @@
   opacity: clamp(0, calc((0.985 - var(--lock-progress, 0)) * 30), 1);
 }
 
-/* 收尾：一层和下一节同色的亮从底下漫上来，画面滚走的时候不是一刀切。 */
+/* 收尾：一层和下一节同色的亮从最底下漫上来一小截，画面滚走的时候不是一刀切。
+   只在最后一点点进度里升起、只盖底下一成半：出水停下的那一幅（水上的芦苇和蓝天、水下的茎）要看得见，
+   不能像上一版那样整个洗白（用户说「最后滚动完全白了感觉都曝光了」）。 */
 .js.stage-ok .lock[data-lock-film] .lock__stage::after {
   content: "";
   position: absolute;
   inset: auto 0 0 0;
-  height: 55%;
-  background: linear-gradient(0deg, var(--zl-bg) 0%, color-mix(in srgb, var(--zl-bg) 70%, transparent) 30%, transparent 100%);
-  opacity: clamp(0, calc((var(--lock-progress, 0) - 0.95) * 22), 1);
+  height: 14%;
+  background: linear-gradient(0deg, var(--zl-bg) 0%, color-mix(in srgb, var(--zl-bg) 55%, transparent) 35%, transparent 100%);
+  opacity: clamp(0, calc((var(--lock-progress, 0) - 0.988) * 90), 1);
   pointer-events: none;
 }
 
@@ -537,8 +535,6 @@
   .js.stage-ok .lock[data-lock-film] .lock__canvas {
     inset: 0 0 auto 0;
     height: 60svh;
-    --film-x: 0.5;
-    --film-y: 0.4;
   }
 
   .js.stage-ok .lock[data-lock-film] .lock__water {
@@ -549,7 +545,7 @@
     height: 40svh;
   }
 
-  /* 一路攒下来的产物有十几件，手机上放不下：只显示这一段刚落下的（影片版、平面版都一样）。 */
+  /* 一路攒下来的产物有十几件，手机上放不下：只显示这一段刚落下的（画布版、平面版都一样）。 */
   .js.stage-ok .lock__water .lock__tag:not([data-now]) {
     display: none;
   }

@@ -115,45 +115,44 @@ test('build 不删输出目录里原有的东西', async () => {
   assert.ok(existsSync(path.join(dir, 'keep.txt')));
 });
 
-// 过闸那一节画布上的影片清单（没有就是 null）。
-function filmOf(text) {
+// 过闸那一节画布上的画面清单（一条鱼游过八段景的长条图；没有就是 null）。
+function reefOf(text) {
   const tag = /<canvas[^>]*data-lock-canvas[^>]*>/.exec(text);
   assert.ok(tag, '页面里没有过闸的画布');
-  const data = /data-film="([^"]*)"/.exec(tag[0]);
+  const data = /data-reef="([^"]*)"/.exec(tag[0]);
   return data ? JSON.parse(data[1].replaceAll('&quot;', '"').replaceAll('&amp;', '&')) : null;
 }
 
-test('带影片：过闸的画布上写着影片的清单，地址相对各页自己', async () => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'poundlock-site-film-'));
-  const film = { sets: { wide: { dir: 'wide', ext: 'webp', count: 240, width: 1920, height: 1080 }, tall: { dir: 'tall', ext: 'webp', count: 120, width: 1080, height: 1440 } } };
-  await build({ outDir: dir, siteUrl: SITE_URL, film });
-  for (const [file, base] of [['index.html', 'assets/film/'], ['en/index.html', '../assets/film/']]) {
-    const data = filmOf(readFileSync(path.join(dir, file), 'utf8'));
-    assert.ok(data, `${file} 的画布上没有影片清单`);
+test('带过闸的画面：画布上写着清单，地址相对各页自己', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'poundlock-site-reef-'));
+  const reef = { viewH: 1.6, scenes: [{ key: 'coral', low: '#000000', high: '#ffffff' }], layers: { mid: { scale: 1, tiles: 2, x0: 0, tileM: 1.8 } } };
+  await build({ outDir: dir, siteUrl: SITE_URL, reef });
+  for (const [file, base] of [['index.html', 'assets/reef/'], ['en/index.html', '../assets/reef/']]) {
+    const data = reefOf(readFileSync(path.join(dir, file), 'utf8'));
+    assert.ok(data, `${file} 的画布上没有清单`);
     assert.equal(data.base, base);
-    assert.deepEqual(data.sets, film.sets);
+    assert.deepEqual(data.layers, reef.layers);
   }
 });
 
-test('不带影片：画布上没有清单，页面用平面的那张图', async () => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'poundlock-site-nofilm-'));
-  await build({ outDir: dir, siteUrl: SITE_URL, film: null });
-  for (const file of ['index.html', 'en/index.html']) assert.equal(filmOf(readFileSync(path.join(dir, file), 'utf8')), null);
+test('不带过闸的画面：画布上没有清单，页面用平面的那张图', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'poundlock-site-noreef-'));
+  await build({ outDir: dir, siteUrl: SITE_URL, reef: null });
+  for (const file of ['index.html', 'en/index.html']) assert.equal(reefOf(readFileSync(path.join(dir, file), 'utf8')), null);
 });
 
-test('不指定时，带不带影片看 src/assets/film/manifest.json 在不在；在的话清单里的每一帧都在', () => {
-  const manifest = path.resolve('src', 'assets', 'film', 'manifest.json');
+test('不指定时，带不带过闸的画面看 src/assets/reef/manifest.json 在不在；在的话清单里的每一块都在', () => {
+  const manifest = path.resolve('src', 'assets', 'reef', 'manifest.json');
   for (const page of pages) {
-    const data = filmOf(page.text);
+    const data = reefOf(page.text);
     if (!existsSync(manifest)) {
       assert.equal(data, null);
       continue;
     }
-    assert.ok(data, `${page.file} 没带上影片`);
-    for (const set of Object.values(data.sets)) {
-      const files = readdirSync(path.join(out, 'assets', 'film', set.dir));
-      assert.equal(files.length, set.count, `${set.dir} 的帧数和清单对不上`);
-      for (let k = 0; k < set.count; k++) assert.ok(files.includes(`f${String(k).padStart(4, '0')}.${set.ext}`), `${set.dir} 缺第 ${k} 帧`);
+    assert.ok(data, `${page.file} 没带上过闸的画面`);
+    for (const [name, layer] of Object.entries(data.layers)) {
+      const files = readdirSync(path.join(out, 'assets', 'reef', name));
+      for (let k = 0; k < layer.tiles; k++) assert.ok(files.includes(`${String(k).padStart(2, '0')}.webp`), `${name} 缺第 ${k} 块`);
     }
   }
 });

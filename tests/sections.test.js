@@ -17,7 +17,7 @@ const pages = {};
 
 before(async () => {
   out = mkdtempSync(path.join(tmpdir(), 'poundlock-site-sections-'));
-  await build({ outDir: out, siteUrl: 'https://example.test/x/', film: null });
+  await build({ outDir: out, siteUrl: 'https://example.test/x/', reef: null });
   pages.zh = { t: load('zh'), text: readFileSync(path.join(out, 'index.html'), 'utf8') };
   pages.en = { t: load('en'), text: readFileSync(path.join(out, 'en', 'index.html'), 'utf8') };
 });

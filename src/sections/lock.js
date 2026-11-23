@@ -43,9 +43,9 @@ function ledger(t, live) {
 }
 
 export function render(ctx) {
-  const { t, base, film } = ctx;
-  // 影片的清单（压片脚本写的那份，原样带上）：取帧表、视频的几档、后备的几套图片。没有影片（还没渲染、或者有意不带）就不写，页面用平面的那张图。
-  const filmData = film ? JSON.stringify({ ...film, base: `${base}assets/film/` }) : null;
+  const { t, base, reef } = ctx;
+  // 过闸的新画面（一条鱼游过八段景）的清单：长条图怎么切、在哪、每段的水色。没有就不写。
+  const reefData = reef ? JSON.stringify({ ...reef, base: `${base}assets/reef/` }) : null;
   const last = stages[stages.length - 1];
   const lastCopy = t.lock.stages[last.id];
   return html`<section id="lock" class="lock" data-section="lock" data-zone="rise" data-lock>
@@ -55,8 +55,8 @@ export function render(ctx) {
   </header>
   <div class="lock__track" data-lock-track>
     <div class="lock__stage">
-      <!-- 过闸的影片画在这里，滚到哪画哪一帧；没有影片时它不显示，用下面那张平面的图。 -->
-      ${filmData ? html`<canvas class="lock__canvas" data-lock-canvas data-film="${filmData}" aria-hidden="true"></canvas>` : html`<canvas class="lock__canvas" data-lock-canvas aria-hidden="true"></canvas>`}
+      <!-- 一条鱼游过八段景，画在这里（lock-reef.js），滚到哪画到哪；走不了这一路时它不显示，用下面那张平面的图。 -->
+      ${reefData ? html`<canvas class="lock__canvas" data-lock-canvas data-reef="${reefData}" aria-hidden="true"></canvas>` : html`<canvas class="lock__canvas" data-lock-canvas aria-hidden="true"></canvas>`}
       <!-- 水面以上：同一张图换成浅色版，停在最后一段。动效在的时候垫在水的下面，水退下去才露出来。 -->
       <div class="lock__layer lock__air on-light" aria-hidden="true">
         <div class="lock__scene">${renderScene({ tone: 'light' })}</div>

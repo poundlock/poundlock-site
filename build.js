@@ -22,9 +22,9 @@ const COPIES = [
   ['assets', ''],
 ];
 
-// 影片的清单（tools/film/encode.mjs 写的）。影片还没渲染出来时没有这个文件，页面就不带影片。
-async function loadFilm() {
-  const file = path.join(SRC, 'assets', 'film', 'manifest.json');
+// 过闸那一节的画面清单（tools/reef/encode.py 写的）。没有这个文件，页面就不带这一路画面。
+async function loadReef() {
+  const file = path.join(SRC, 'assets', 'reef', 'manifest.json');
   return existsSync(file) ? JSON.parse(await readFile(file, 'utf8')) : null;
 }
 
@@ -32,8 +32,8 @@ async function loadCopy(code) {
   return JSON.parse(await readFile(path.join(SRC, 'copy', `${code}.json`), 'utf8'));
 }
 
-// film：不传就读 src/assets/film/manifest.json；传 null 是有意不带影片。
-export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version = 'dev', commit = '', film } = {}) {
+// reef：不传就读 src/assets/reef/manifest.json；传 null 是有意不带过闸的那一路画面（页面用平面的图）。
+export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version = 'dev', commit = '', reef } = {}) {
   const out = path.resolve(ROOT, outDir);
   const assets = path.join(out, 'assets');
   await mkdir(assets, { recursive: true });
@@ -46,7 +46,7 @@ export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version
     if (existsSync(source)) await cp(source, path.join(assets, to), { recursive: true });
   }
 
-  const filmManifest = film === undefined ? await loadFilm() : film;
+  const reefManifest = reef === undefined ? await loadReef() : reef;
   // 首屏演示里终端的字：插件本身是中文的，中英两页用同一份
   const heroDemo = await loadCopy('hero-demo');
   const pages = [];
@@ -58,7 +58,7 @@ export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version
       base: lang.path ? '../'.repeat(lang.path.split('/').filter(Boolean).length) : '',
       config: { ...config, siteUrl },
       version,
-      film: filmManifest,
+      reef: reefManifest,
     };
     const dir = path.join(out, lang.path);
     await mkdir(dir, { recursive: true });

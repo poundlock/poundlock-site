@@ -1,0 +1,94 @@
+{
+ "version": 1,
+ "viewH": 1.6,
+ "stripPx": 1800,
+ "tilePx": 2048,
+ "xStart": 1.6,
+ "xEnd": 38.4,
+ "sceneLen": 5.0,
+ "blend": 1.2,
+ "scenes": [
+  {
+   "key": "coral",
+   "low": "#0a3c58",
+   "high": "#2f8fb5"
+  },
+  {
+   "key": "seagrass",
+   "low": "#0c4650",
+   "high": "#3a9db0"
+  },
+  {
+   "key": "kelp",
+   "low": "#0b3a38",
+   "high": "#2c8580"
+  },
+  {
+   "key": "canyon",
+   "low": "#082c44",
+   "high": "#1d6890"
+  },
+  {
+   "key": "lock",
+   "low": "#0e3133",
+   "high": "#2b6563"
+  },
+  {
+   "key": "jelly",
+   "low": "#040d24",
+   "high": "#102c62"
+  },
+  {
+   "key": "river",
+   "low": "#1a4636",
+   "high": "#56a486"
+  },
+  {
+   "key": "shallow",
+   "low": "#25554a",
+   "high": "#86c8b6"
+  }
+ ],
+ "layers": {
+  "far": {
+   "scale": 0.4,
+   "tiles": 11,
+   "x0": -3.2,
+   "tileM": 4.551111,
+   "aux": false
+  },
+  "mid": {
+   "scale": 1.0,
+   "tiles": 23,
+   "x0": -0.32,
+   "tileM": 1.820444,
+   "aux": true
+  },
+  "above": {
+   "scale": 1.0,
+   "tiles": 3,
+   "x0": 35.08,
+   "tileM": 1.820444,
+   "aux": false
+  }
+ },
+ "back": {
+  "x0": -3.2,
+  "x1": 43.2
+ },
+ "aboveTo": 0.74,
+ "fish": {
+  "cols": 6,
+  "rows": 4,
+  "frames": 24,
+  "len": 0.42,
+  "frameW": 640,
+  "frameH": 320,
+  "frameOverLen": 1.43
+ },
+ "jelly": {
+  "cols": 4,
+  "rows": 4,
+  "frames": 16
+ }
+}

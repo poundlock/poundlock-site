@@ -3,7 +3,7 @@
 .site-header {
   /* 不做渐变：过闸快结束、水面退到页头后面的那一刻（--rise 到 0.94）一下子从深换到浅。
      慢慢混的话，中间有一段字和底都是灰的，看不清。 */
-  /* 影片版的过闸会直接告诉页头天亮了没有（--header-day，0 或 1）；平面的那一版没有它，就按进度算。 */
+  /* 画布版的过闸会直接告诉页头出水了没有（--header-day，0 或 1）；平面的那一版没有它，就按进度算。 */
   --header-flip: var(--header-day, clamp(0, (var(--rise) - 0.94) * 1000, 1));
   --header-ink: color-mix(in srgb, var(--zd-fg), var(--zl-fg) calc(var(--header-flip) * 100%));
   --header-ground: color-mix(in srgb, var(--zd-bg), var(--zl-bg) calc(var(--header-flip) * 100%));
