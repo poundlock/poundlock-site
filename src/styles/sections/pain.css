@@ -1,9 +1,10 @@
 /* 痛点：三句 AI 常说的话，各配一句实际发生的事。篇幅小，是给过闸铺垫的。
-   上面那句是「它说的」，画成一片浅水色的话；下面那句是「实际上」，前面一道闸缝。 */
+   写法照首屏终端里的会话记录：「它说的」前面一个圆点，「实际上」前面一个折角（└），像终端里工具结果的那一行。
+   原来「它说的」画成一片浅水色的胶囊，和首屏的按钮一个样子，在深色底上像三个能点的按钮、特别跳（2026-11-22 改掉）。 */
 
 .pain {
   padding-top: var(--space-6);
-  padding-bottom: var(--space-7);
+  padding-bottom: var(--space-6);
 }
 
 .pain .section__title {
@@ -16,32 +17,61 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-6) var(--space-5);
-  margin-top: var(--space-6);
+  margin-top: var(--space-5);
 }
 
+/* 每一条两行：左边一栏放记号（圆点、折角），右边一栏放字，两行的字左边对齐 */
 .pain__item {
   display: grid;
+  grid-template-columns: 1.4em minmax(0, 1fr);
   align-content: start;
-  justify-items: start;
-  gap: var(--space-3);
+  row-gap: var(--space-2);
+}
+
+.pain__item::before,
+.pain__item::after {
+  grid-column: 1;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+
+/* 圆点和「它说的」第一行竖着居中：行高等于那一行的行高 */
+.pain__item::before {
+  content: "●";
+  grid-row: 1;
+  font-size: 0.6875rem;
+  line-height: calc(var(--text-4) * 1.45);
+}
+
+.pain__item::after {
+  content: "└";
+  grid-row: 2;
+  padding-left: 0.2em;
+  font-size: var(--text-3);
+  line-height: 1.6;
+  color: var(--line);
 }
 
 .pain__claim {
-  padding: 0.6em 1.05em;
-  border-radius: var(--radius-m) var(--radius-m) var(--radius-m) 4px;
+  grid-column: 2;
+  grid-row: 1;
   font-size: var(--text-4);
   font-weight: 600;
   line-height: 1.45;
-  color: var(--btn-fg);
-  background: linear-gradient(180deg, var(--btn-0), var(--btn-1));
+  color: var(--fg);
 }
 
 .pain__truth {
-  padding-left: var(--space-3);
-  border-left: 4px solid var(--line);
+  grid-column: 2;
+  grid-row: 2;
   font-size: var(--text-3);
   line-height: 1.6;
-  color: var(--fg);
+  color: var(--muted);
+}
+
+/* 后面紧跟着过闸：两节之间不重复留两份空，过闸的标题离这三句近一些 */
+.pain + .lock {
+  padding-top: var(--space-7);
 }
 
 @media (max-width: 820px) {
@@ -52,5 +82,9 @@
 
   .pain__claim {
     font-size: var(--text-3);
+  }
+
+  .pain__item::before {
+    line-height: calc(var(--text-3) * 1.45);
   }
 }

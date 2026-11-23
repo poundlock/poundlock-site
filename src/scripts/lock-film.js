@@ -5,6 +5,7 @@
 
 import { frameAtTable, subsample } from './film-schedule.js';
 import { FOLLOW } from './lock.js';
+import { createFollower } from './follow.js';
 import { styleWriter } from './style-writer.js';
 
 // 进度（0 到 1）对应第几帧。
@@ -101,6 +102,7 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
   let drawn = -1;
   let shown = null;
   let last = null;
+  const follower = createFollower(FOLLOW);
   let anchor = { x: 0.5, y: 0.5 };
   let focus = [0.5, 0.5];
   let table = null;
@@ -214,7 +216,7 @@ export function mountFilm(root, canvas, film, { onFail } = {}) {
       // 第一帧直接到位（刷新、带锚点进来时不从头演一遍）；之后带着惯性追。
       const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
       last = now;
-      shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * FOLLOW));
+      shown = follower.step(progress, dt, snap);
       wanted = indexAt(shown);
       canvas.dataset.want = String(wanted);
       hurry(now);

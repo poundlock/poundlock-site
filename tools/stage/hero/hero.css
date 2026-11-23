@@ -209,10 +209,10 @@
     text-align: center;
   }
 
-  /* Claude Code 干活时那颗一直在变的星：同一格里一个个换字形，不转圈 */
+  /* Claude Code 干活时那颗一直在变的星：同一格里一个个换字形，不转圈。一圈 2.4 秒，不在水面旁边闪个不停 */
   & .ph-spin::before {
     content: "✻";
-    animation: ph-spin 1.2s steps(1) infinite;
+    animation: ph-spin 2.4s steps(1) infinite;
   }
 
   & .ph-tick {
@@ -246,7 +246,7 @@
     height: 6px;
     border-radius: 2px;
     background: rgba(255, 255, 255, 0.1);
-    transition: background-color 0.2s ease;
+    transition: background-color 0.6s var(--ease-water, cubic-bezier(0.16, 0.84, 0.3, 1));
   }
 
   & .ss-stage[data-layout="compact"] .ph-meter {
@@ -324,29 +324,56 @@
   }
 }
 
-/* 终端输出一条条出来：套件的展开是给网页卡片调的（420–460ms、柔和曲线），对一个终端偏慢偏软。
-   真的终端里输出是一下子出来的；讲故事可以比它慢，但不慢到像网页卡片：收到 260ms 上下、一开始就快的减速曲线。
-   只改快慢，不改它怎么展开（内容先暗、高度合拢、落下来那一套照旧）。 */
+/* 终端输出一条条出来，照官网的动效规矩「水慢、闸快」（官网 docs/visual-direction.md 的「动效」）：
+   新的一行从底下进来、整段记录跟着往上推，是水位在升：0.7 秒，官网水的曲线（先快后慢地停住，不回弹）；
+   面板收起也是水，0.5 秒。只有门禁拦下那一下是闸：那块反白的牌子 0.32 秒落定，带一点过冲。
+   原来一行 0.26 秒弹出来，一段段往上顿，和首屏慢慢晃的水面撞在一起（2026-11-22 改）。
+   只改快慢和曲线，不改它怎么展开（内容先暗、高度合拢、落下来那一套照旧）。曲线取官网的变量，取不到时用同样的值。 */
 .ph .ph-term {
+  --ph-water: var(--ease-water, cubic-bezier(0.16, 0.84, 0.3, 1));
+  --ph-gate: var(--ease-gate, cubic-bezier(0.34, 1.4, 0.5, 1));
+
   & .ss-collapse {
     transition:
-      grid-template-rows 0.26s cubic-bezier(0.23, 1, 0.32, 1) 0.03s,
-      opacity 0.26s cubic-bezier(0, 0.8, 0.5, 1);
+      grid-template-rows 0.5s var(--ph-water) 0.04s,
+      opacity 0.36s cubic-bezier(0, 0.8, 0.5, 1);
   }
 
   & .ss-collapse[data-open] {
     transition:
-      grid-template-rows 0.26s cubic-bezier(0.23, 1, 0.32, 1),
-      opacity 0.16s ease-out 0.08s;
+      grid-template-rows 0.7s var(--ph-water),
+      opacity 0.42s ease-out 0.16s;
   }
 
   & .ss-collapse[data-reveal="drop"][data-open] {
     transition:
-      grid-template-rows 0.3s cubic-bezier(0.23, 1, 0.32, 1),
-      opacity 0.2s ease 0.12s;
+      grid-template-rows 0.7s var(--ph-water),
+      opacity 0.4s ease 0.18s;
   }
 
   & .ss-collapse[data-reveal="drop"][data-open] > .ss-collapse__inner > .ss-collapse__glide {
-    transition: transform 0.36s cubic-bezier(0.23, 1, 0.32, 1) 0.1s;
+    transition: transform 0.7s var(--ph-water) 0.12s;
+  }
+
+  /* 门禁的牌子：那一行展开到一半时像闸门一样落定（从略小、略透明到位，带一点过冲） */
+  & .ss-collapse[data-open] .ph-gate {
+    animation: ph-gate 0.32s var(--ph-gate) 0.22s both;
+  }
+}
+
+@keyframes ph-gate {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ph .ph-term .ss-collapse[data-open] .ph-gate {
+    animation: none;
   }
 }

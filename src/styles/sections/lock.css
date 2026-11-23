@@ -493,6 +493,23 @@
   background: var(--bg);
 }
 
+/* 影片从这一节的底色里淡出来，画布的上沿不是横着一刀切。这层渐变挂在标题下面、跟着标题一起滚：
+   舞台刚粘住时它还盖着画面上面一截（远处的闸和天光是一点点露出来的），再往下滚三成屏它就滚出了视口，不用脚本。
+   左右铺满这一节：标题本身不定位，渐变的参照就是这一节（左右 0 是整节宽）；不写 top，竖着落在它原本的位置
+   （标题的字下面），再往下挪标题的下边距，正好是画布的上沿。不用 100vw：它把滚动条也算进去，会撑出横向滚动条。 */
+.js.stage-ok .lock[data-lock-film] .lock__head::after {
+  content: "";
+  display: block;
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  margin-top: var(--space-6);
+  height: 32svh;
+  background: linear-gradient(180deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 62%, transparent) 38%, transparent 100%);
+  pointer-events: none;
+}
+
 /* 字压在画面上：左边和底下各垫一层往画面里淡出去的暗色，字才读得清。
    画面两侧一直是暗的（夜里是岸，天亮了是逆光的树林），所以字从头到尾用浅色，不跟着天亮换。
    快到头的时候字淡出去，让位给下面那层升上来的亮色。 */

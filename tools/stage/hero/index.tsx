@@ -64,6 +64,9 @@ const FRESH: Run = { sent: false, ask: false, answered: false, stage: 0, done: 0
 const FINISHED: Run = { sent: true, ask: false, answered: true, stage: 8, done: 8, write: true, blocked: true, rewrite: true, verdict: true }
 const initial: S = { ...FRESH, typed: '', n: 0 }
 
+// 节奏照官网的动效规矩「水慢、闸快」：记录往上推是水位在升（样式里 0.7 秒、水的曲线），段与段之间留够看的时间；
+// 只有门禁拦下那一下是快的（样式里那块反白的牌子像闸门落下）。原来每段 0.5 秒上下一换、一行 0.26 秒弹出来，
+// 和首屏慢慢晃的水面撞在一起，用户说「不是很和谐，有点冲突」（2026-11-22 放慢）。一圈二十四秒上下。
 function makeScript(copy: Copy) {
   return async function script(a: Act<S>) {
     // 这一圈敲哪一条，看状态里的 n（上一圈收尾时换好了）
@@ -72,47 +75,47 @@ function makeScript(copy: Copy) {
       current = s.n
       return {}
     })
-    await a.wait(900)
-    await a.type('typed', copy.reqs[current].command)
-    await a.wait(260)
+    await a.wait(1200)
+    await a.type('typed', copy.reqs[current].command, { interval: 55 })
+    await a.wait(420)
     await a.key('enter')
     await a.set({ sent: true, typed: '' })
-    await a.wait(560)
+    await a.wait(900)
     a.mark('ask')
     await a.set({ ask: true })
-    await a.wait(1500)
+    await a.wait(2100)
     await a.key('enter')
-    // 先把面板收起，新的一行再从下面进来：不在同一个位置叠着淡入两段字
+    // 先把面板收起，新的一行再从下面进来：不在同一个位置叠着淡入两段字（面板收起要 0.5 秒）
     await a.set({ ask: false })
-    await a.wait(380)
+    await a.wait(560)
     await a.set({ answered: true, stage: 1 })
     // S1 到 S4：一段接一段
     for (let i = 1; i <= 4; i++) {
-      await a.wait(520)
+      await a.wait(820)
       await a.set({ done: i, stage: i + 1 })
     }
     // S5 实现：一个角色想写不归它管的文件，门禁拦下，改由认领这个文件的角色写
-    await a.wait(640)
+    await a.wait(980)
     await a.set({ write: true })
-    await a.wait(560)
+    await a.wait(860)
     a.mark('gate')
     await a.set({ blocked: true })
-    await a.wait(1900)
+    await a.wait(2400)
     await a.set({ rewrite: true })
-    await a.wait(900)
+    await a.wait(1200)
     await a.set({ done: 5, stage: 6 })
-    await a.wait(560)
+    await a.wait(820)
     await a.set({ done: 6, stage: 7 })
-    await a.wait(700)
+    await a.wait(980)
     a.mark('verdict')
     await a.set({ verdict: true })
-    await a.wait(480)
+    await a.wait(760)
     await a.set({ done: 7, stage: 8 })
-    await a.wait(560)
+    await a.wait(820)
     await a.set({ done: 8 })
     a.mark('payoff')
-    await a.wait(2200)
-    // 屏幕上这时是「一趟跑完的样子」：活的这一趟收起、换下一条需求，垫在上面的两趟跟着换成「上上趟、上一趟」。看不见地复位
+    await a.wait(3600)
+    // 屏幕上这时是「一趟跑完的样子」：活的这一趟收起、换下一条需求，垫在上面的几趟跟着换一遍。看不见地复位
     await a.snap({ ...FRESH, typed: '', n: current === 0 ? 1 : 0 })
   }
 }

@@ -8,6 +8,7 @@
 
 import { lockStateAt } from './lock-state.js';
 import { styleWriter } from './style-writer.js';
+import { createFollower } from './follow.js';
 import { mountFilm } from './lock-film.js';
 import { mountVideo } from './lock-video.js';
 import { STAGE_QUERY } from './stage.js';
@@ -26,8 +27,9 @@ export function progressOf(rect, viewportHeight) {
 
 const BEATS = 8;
 
-// 画面追滚动位置的快慢（每秒的衰减率）：12 是时间常数 83ms 上下。影片帧密了以后不用再靠惯性抹平跳帧，
-// 再慢就和浏览器自己的平滑滚动叠在一起，画面要 0.3 秒以上才追上手。影片的两路播放器用同一个数。
+// 画面追滚动位置的弹簧有多硬（follow.js 的 ω，每秒）。12：滚轮滚一格，画面缓缓滑 0.4 秒停住；
+// 匀速滚的时候落后 0.17 秒。原来是一阶的指数趋近（也是 12，时间常数 83ms），滚轮一格一格滚时一顿一顿的。
+// 过闸的三路画面用同一个数。
 export const FOLLOW = 12;
 
 // 收尾那两处淡入淡出（lock.css：水面那一层退掉、底下那层亮色升上来）只在进度 0.95 到 0.9955 之间变，
@@ -127,12 +129,13 @@ function mountFlat(root, anime) {
   // 和影片那一版一样：第一帧直接到位，之后带着惯性追滚动位置。
   let shown = null;
   let last = null;
+  const follower = createFollower(FOLLOW);
   return {
     kind: 'flat',
     frame(progress, now, snap = false) {
       const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
       last = now;
-      shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * FOLLOW));
+      shown = follower.step(progress, dt, snap);
       timeline.seek(shown * BEATS * BEAT);
       render();
     },

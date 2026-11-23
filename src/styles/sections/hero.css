@@ -9,8 +9,10 @@
   padding-top: calc(64px + var(--space-6));
   padding-bottom: var(--space-7);
   overflow: hidden;
-  /* 水面没起来时的样子：和图标同一个方向的底、左上一抹光。 */
+  /* 水面没起来时的样子：和图标同一个方向的底、左上一抹光。
+     最底下收到下一节的底色（最上面那层）：不收的话左下角偏亮，和下一节的纯色撞出一道横线。 */
   background:
+    linear-gradient(180deg, transparent 55%, var(--bg) 100%),
     radial-gradient(110% 80% at 14% 6%, color-mix(in srgb, var(--scene-glow) 26%, transparent), transparent 62%),
     linear-gradient(140deg, var(--scene-0), var(--scene-1) 78%);
 }

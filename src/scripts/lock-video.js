@@ -7,6 +7,7 @@
 import { frameAtTable } from './film-schedule.js';
 import { DAY_AT, coverRect } from './lock-film.js';
 import { FOLLOW } from './lock.js';
+import { createFollower } from './follow.js';
 import { styleWriter } from './style-writer.js';
 
 const ORDER = ['mid', 'wide', 'uhd']; // 从小到大；手机那一档单算
@@ -153,6 +154,7 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
   let drawn = -1;
   let shown = null;
   let last = null;
+  const follower = createFollower(FOLLOW);
   let filled = false;
   let dead = false;
   let booting = true; // 还在 mountVideo 里面：这时候不行就直接返回 null，不调 onFail（调用方还没拿到返回值）
@@ -505,7 +507,7 @@ export function mountVideo(root, canvas, film, { onFail } = {}) {
       const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
       last = now;
       const before = shown;
-      shown = shown === null || snap ? progress : shown + (progress - shown) * (1 - Math.exp(-dt * FOLLOW));
+      shown = follower.step(progress, dt, snap);
       if (before !== null && shown !== before) direction = shown > before ? 1 : -1;
       wanted = frameAtTable(table, shown);
       canvas.dataset.want = String(wanted);
