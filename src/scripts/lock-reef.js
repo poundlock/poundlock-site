@@ -166,8 +166,8 @@ export function createFishBehavior(seed = 7) {
 }
 
 const RESOLUTION = 0.75;
-// 显卡里最多留几块长条图（中景另带同样多的辅助图）：眼前两块加前后各一块。一块 2048×1800 要 15 MB 显存
-const TEX_LIMIT = { mid: 4, far: 3 };
+// 显卡里最多留几块长条图（中景另带同样多的辅助图）：眼前两块、往前两块、往后一块。一块 2048×1800 要 15 MB 显存
+const TEX_LIMIT = { mid: 5, far: 4 };
 // 出水停下时水线在画面从上往下的哪里（清单里没写就用这个）
 const ABOVE_TO = 0.74;
 
@@ -262,7 +262,8 @@ void main() {
     float wx = u_world.x + v_uv.x * u_world.y;
     float sy = (1.0 - v_uv.y) * u_viewH;
     float wave = sin(u_time * 1.1 + wx * 2.3 + sy * 1.7) * 0.65 + sin(u_time * 0.63 + wx * 0.9 + 1.7) * 0.35;
-    float off = aux.g * u_sway * 0.022 * wave;
+    float edge = smoothstep(0.0, 0.035, v_uv.x) * smoothstep(1.0, 0.965, v_uv.x);
+    float off = aux.g * u_sway * 0.022 * wave * edge;
     vec2 uv = v_uv + vec2(off / u_world.y, 0.0);
     vec4 c = texture2D(u_tex, uv);
     float lit = texture2D(u_aux, uv).r;
@@ -491,52 +492,107 @@ export function mountReef(root, canvas, { onFail } = {}) {
 
   // 下完、等着传进显卡的（还不在 textures 里）：也算已经要过了，不然每帧都会再要一遍，队伍越排越长
   const queued = new Set();
+  // 一张 2048×1800 的图整张传进显卡要十几毫秒：滚动中途传就是一下卡顿（用户说「有的时候滚轮一卡一卡的」）。
+  // 所以在后台线程解码、切成 512 宽的竖条，一帧只传一条。
+  const PIECE = 512;
+  const bitmaps = typeof win.createImageBitmap === 'function' && typeof win.fetch === 'function';
+  const closeItem = (item) => {
+    for (const piece of item.pieces || []) if (piece.close) piece.close();
+  };
   const request = (key, url) => {
     if (textures.has(key) || loading.has(key) || queued.has(key) || dead) return;
     loading.add(key);
-    const img = new win.Image();
-    img.decoding = 'async';
-    img.src = url;
-    const done = () => {
+    const done = (item) => {
       loading.delete(key);
-      if (dead) return;
+      if (dead) {
+        closeItem(item);
+        return;
+      }
       queued.add(key);
-      ready.push({ key, img });
+      ready.push(item);
     };
     const failed = () => {
       loading.delete(key);
       failures++;
     };
-    if (img.decode) img.decode().then(done, failed);
+    if (bitmaps) {
+      win
+        .fetch(url)
+        .then((res) => (res.ok ? res.blob() : Promise.reject(new Error(String(res.status)))))
+        .then((blob) => win.createImageBitmap(blob, { premultiplyAlpha: 'premultiply' }))
+        .then((whole) => {
+          const w = whole.width;
+          const h = whole.height;
+          const cuts = [];
+          for (let x = 0; x < w; x += PIECE) cuts.push(win.createImageBitmap(whole, x, 0, Math.min(PIECE, w - x), h, { premultiplyAlpha: 'premultiply' }));
+          return Promise.all(cuts).then((pieces) => {
+            whole.close();
+            return { key, w, h, pieces };
+          });
+        })
+        .then(done, failed);
+      return;
+    }
+    const img = new win.Image();
+    img.decoding = 'async';
+    img.src = url;
+    const ok = () => done({ key, img, w: img.naturalWidth, h: img.naturalHeight });
+    if (img.decode) img.decode().then(ok, failed);
     else {
-      img.onload = done;
+      img.onload = ok;
       img.onerror = failed;
     }
   };
-  const upload = () => {
-    // 先传眼前要用的（want 里标了的），别的往后排
-    let at = ready.findIndex((r) => needed.has(r.key));
-    if (at < 0) at = 0;
-    const item = ready.splice(at, 1)[0];
-    if (!item) return;
-    queued.delete(item.key);
-    if (textures.has(item.key)) return;
+  const newTexture = () => {
     const tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, item.img);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    textures.set(item.key, { tex, used: win.performance.now(), w: item.img.naturalWidth, h: item.img.naturalHeight });
+    return tex;
+  };
+  let job = null;
+  const upload = () => {
+    if (!job) {
+      // 先传眼前要用的（want 里标了的），别的往后排
+      let at = ready.findIndex((r) => needed.has(r.key));
+      if (at < 0) at = 0;
+      const item = ready.splice(at, 1)[0];
+      if (!item) return;
+      queued.delete(item.key);
+      if (textures.has(item.key)) {
+        closeItem(item);
+        return;
+      }
+      const tex = newTexture();
+      if (!item.pieces) {
+        // <img>：整张传，要 WebGL 帮着预乘透明度
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, item.img);
+        textures.set(item.key, { tex, used: win.performance.now(), w: item.w, h: item.h });
+        return;
+      }
+      // 竖条：先在显卡里占好整张的地方，之后一帧填一条；填满了才算有这张图
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, item.w, item.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      job = { ...item, tex, next: 0 };
+    }
+    gl.bindTexture(gl.TEXTURE_2D, job.tex);
+    const piece = job.pieces[job.next];
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, job.next * PIECE, 0, gl.RGBA, gl.UNSIGNED_BYTE, piece);
+    if (piece.close) piece.close();
+    job.next++;
+    if (job.next >= job.pieces.length) {
+      textures.set(job.key, { tex: job.tex, used: win.performance.now(), w: job.w, h: job.h });
+      job = null;
+    }
   };
   const evict = (prefix, keep, limit) => {
     // 排着队等传、但已经不在要留的范围里的，从队里拿掉（滚得快时这一路上经过的块不用都传一遍）
     for (let i = ready.length - 1; i >= 0; i--) {
       if (ready[i].key.startsWith(prefix) && !keep.has(ready[i].key)) {
         queued.delete(ready[i].key);
-        ready.splice(i, 1);
+        closeItem(ready.splice(i, 1)[0]);
       }
     }
     const own = [...textures.entries()].filter(([k]) => k.startsWith(prefix) && !keep.has(k));
@@ -571,7 +627,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
     for (const name of ['far', 'mid']) {
       const layer = m.layers[name];
       const [a, b] = visibleTiles(layer, camX, aspect, m.viewH);
-      const ahead = dir >= 0 ? [b + 1, a - 1] : [a - 1, b + 1];
+      const ahead = dir >= 0 ? [b + 1, b + 2, a - 1] : [a - 1, a - 2, b + 1];
       for (const i of [...Array(b - a + 1).keys()].map((n) => a + n).concat(filling ? ahead : [])) {
         if (i < 0 || i >= layer.tiles) continue;
         if (i >= a && i <= b) {
@@ -971,7 +1027,8 @@ export function mountReef(root, canvas, { onFail } = {}) {
       lastCam = camX;
       want(camX, aspect, dir);
       upload();
-      if (urgent < 3 && ready.length) {
+      if (urgent < 24 && (ready.length || job)) {
+        upload();
         upload();
         urgent++;
       }
@@ -1011,6 +1068,13 @@ export function mountReef(root, canvas, { onFail } = {}) {
       canvas.removeEventListener('webglcontextlost', onLost);
       for (const t of textures.values()) gl.deleteTexture(t.tex);
       textures.clear();
+      for (const item of ready) closeItem(item);
+      ready.length = 0;
+      if (job) {
+        closeItem({ pieces: job.pieces.slice(job.next) });
+        gl.deleteTexture(job.tex);
+        job = null;
+      }
       headerVars.clear('--header-day');
       root.removeAttribute('data-day');
       root.removeAttribute('data-lock-film-ready');
