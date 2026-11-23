@@ -252,6 +252,32 @@
   display: none;
 }
 
+/* 水面活着的时候（water.js 在首屏上标 hero--glass）：终端的底换成半透明的深色，透出后面着色器画的糊开、压暗的水，
+   像一块磨砂的深色玻璃，不是一整块实心的暗板。水落到静态（减少动效、没有 WebGL、帧率撑不住）时撤掉标记，终端回到实心的底。
+   不用 backdrop-filter：后面的水每帧都在动，浏览器每帧都要重新糊一遍整块，太费；糊是着色器自己在那一块画的。 */
+.hero--glass .hero__demo .ph--site .ph-win {
+  background: linear-gradient(168deg, color-mix(in srgb, var(--zd-raise) 60%, transparent), color-mix(in srgb, var(--zd-bg) 78%, transparent));
+}
+
+/* 水面活着的时候，标题和副标题身后压在亮的水面上：给字本身加一圈柔和的暗晕，字读得清，字周围的水面照样看得见
+   （不在着色器里整块压暗：那样顶上那一条水面就没了）。 */
+.hero--glass .hero__title,
+.hero--glass .hero__sub,
+.hero--glass .hero__note {
+  text-shadow:
+    0 1px 2px color-mix(in srgb, var(--shade) 45%, transparent),
+    0 0 26px color-mix(in srgb, var(--shade) 60%, transparent);
+}
+
+/* 小字压在亮水面上更吃力：用正文的白，暗晕收紧加重 */
+.hero--glass .hero__sub,
+.hero--glass .hero__note {
+  color: var(--fg);
+  text-shadow:
+    0 1px 2px color-mix(in srgb, var(--shade) 60%, transparent),
+    0 0 14px color-mix(in srgb, var(--shade) 70%, transparent);
+}
+
 /* 演示压在水面上：页面就是底，不垫板子；字用官网自己的等宽和中文字体 */
 .hero__demo .ph--site .ss-stage {
   --ph-ground: transparent;

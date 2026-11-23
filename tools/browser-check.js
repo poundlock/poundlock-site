@@ -1043,7 +1043,8 @@ export const CHECKS = [
       const before = await layout(reserved);
       await reserved.close();
       await page.goto(url, { waitUntil: 'load' });
-      await page.waitForSelector('[data-hero-demo][data-ready]', { timeout: 10000 });
+      // 等 15 秒：无头的 WebKit 用 CPU 画水面的着色器，偶尔把整页拖慢，10 秒时有过一次没挂上（重跑都过）
+      await page.waitForSelector('[data-hero-demo][data-ready]', { timeout: 15000 });
       await page.waitForTimeout(700);
       const after = await layout(page);
       expect(JSON.stringify(before) === JSON.stringify(after), `演示挂上前后版式变了：${JSON.stringify(before)} → ${JSON.stringify(after)}`);
