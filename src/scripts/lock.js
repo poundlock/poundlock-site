@@ -56,6 +56,19 @@ export function nextStop(stops, p, dir) {
   return null;
 }
 
+// 什么时候挂上过闸的画面：返回再等多少毫秒，null 是先不挂。纯函数，Node 里能测。
+// 这一节紧挨着首屏，页面一打开它就在「一屏以内」。原来打开 3.5 秒就挂，停在首屏不往下看的人也要下近 3 MB；
+// 国内的线路上（Cloudflare 把访客分到欧洲的节点，实测 100 来 KB/s）这近 3 MB 还会跟眼前要用的那块抢带宽。
+// 现在：一打开就不在首屏（在过闸中间刷新、带着锚点进来）马上挂；在首屏的，等访客往下滚了一点
+// （或者窗口很高、这一节本来就露在视口里）才挂，而且不早于页面打开 MOUNT_AFTER 毫秒（别抢首屏入场动画的帧）。
+export const MOUNT_AFTER = 3500;
+export const MOUNT_SCROLL = 0.15;
+export function mountDelay({ now, scrollY, viewportHeight, inView }) {
+  if (scrollY >= viewportHeight * 0.5) return 0;
+  if (inView || scrollY >= viewportHeight * MOUNT_SCROLL) return Math.max(0, MOUNT_AFTER - now);
+  return null;
+}
+
 export function fadeProgress(progress) {
   return Math.min(FADE_TO, Math.max(FADE_FROM, progress));
 }
@@ -271,9 +284,19 @@ function openStage(root, anime) {
     if (scene) scene.frame(progress, now);
     frame = inView ? win.requestAnimationFrame(loop) : 0;
   };
+  // 离这一节还有一屏、而且访客往下滚了（mountDelay）才挂上画面（先只下眼前这一两块长条图）。
+  let timer = 0;
+  let near = false;
+  const maybeMount = () => {
+    if (!near || scene || timer) return;
+    const delay = mountDelay({ now: win.performance.now(), scrollY: win.scrollY, viewportHeight: win.innerHeight, inView });
+    if (delay !== null) timer = win.setTimeout(mount, delay);
+  };
+
   const observer = new win.IntersectionObserver((entries) => {
     inView = entries[entries.length - 1].isIntersecting;
     apply();
+    maybeMount();
     if (inView) {
       // 访客真的滚进来了：前后几块长条图这时候才开始预先下。
       if (scene && scene.fill) scene.fill();
@@ -284,22 +307,21 @@ function openStage(root, anime) {
   });
   observer.observe(track);
 
-  // 离这一节还有一屏的时候挂上画面（先只下眼前这一两块长条图和鱼）。
-  let timer = 0;
   const nearby = new win.IntersectionObserver(
     (entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       nearby.disconnect();
-      // 这一节紧挨着首屏：页面刚打开时它就算「快到了」。访客还在首屏，就等首屏那段入场动画放完再挂，别抢它的帧；
-      // 已经滚下来了（在过闸中间刷新、带着锚点进来），马上挂。
-      const atTop = win.scrollY < win.innerHeight * 0.5;
-      timer = win.setTimeout(mount, atTop ? Math.max(0, 3500 - win.performance.now()) : 0);
+      near = true;
+      maybeMount();
     },
     { rootMargin: '100% 0px 100% 0px' },
   );
   nearby.observe(track);
 
-  const onChange = () => apply();
+  const onChange = () => {
+    apply();
+    maybeMount();
+  };
   win.addEventListener('scroll', onChange, { passive: true });
 
   // 滚轮一格走一段（用户：「能不能做成滚轮滚一下，就切换一下场景」）。只在舞台粘住的时候接管滚轮：

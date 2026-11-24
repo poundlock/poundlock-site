@@ -3,6 +3,7 @@
 #   python -I tools/reef/encode.py --from .shots/reef/strip --to src/assets/reef [--res 1] [--quality 82]
 #
 # 每块左右多渲的 PAD_PX 在这里裁掉；中景的两张辅助图（阳光直射、摆动量）合成一张：红 = 阳光，绿 = 摆动，半分辨率。
+# 最后调 preview.py 给每块压一张四分之一的预览图。
 # --res 和渲染时一样（试渲用的四分之一分辨率就写 0.25），只影响像素数，横向的米数不变。
 # 要 Pillow（带 WebP）。不读写仓库以外的地方。
 import argparse
@@ -15,6 +16,7 @@ from PIL import Image, ImageFilter
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import journey as J  # noqa: E402
+import preview  # noqa: E402
 
 
 def save_webp(img, path, quality, lossless=False):
@@ -113,7 +115,9 @@ def main():
     with open(os.path.join(args.dst, "manifest.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(manifest, fh, ensure_ascii=False, indent=1)
         fh.write("\n")
-    print(f"压好了：{args.dst}，{total / 1e6:.1f} MB")
+    # 每块再压一张四分之一的预览图（页面先下它垫着），并在清单里写上 "preview"
+    count, small = preview.make(args.dst)
+    print(f"压好了：{args.dst}，{total / 1e6:.1f} MB；预览图 {count} 张 {small / 1e6:.2f} MB")
 
 
 main()

@@ -1,8 +1,26 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { FADE_FROM, FADE_TO, beatAt, fadeProgress, nextStop, progressOf, stopsOf } from '../src/scripts/lock.js';
+import { FADE_FROM, FADE_TO, MOUNT_AFTER, beatAt, fadeProgress, mountDelay, nextStop, progressOf, stopsOf } from '../src/scripts/lock.js';
 import { geometry, renderScene } from '../src/sections/lock-scene.js';
+
+test('mountDelay：停在首屏不往下滚就不挂过闸的画面（不下长条图）', () => {
+  assert.equal(mountDelay({ now: 10000, scrollY: 0, viewportHeight: 900, inView: false }), null);
+  assert.equal(mountDelay({ now: 10000, scrollY: 60, viewportHeight: 900, inView: false }), null);
+});
+
+test('mountDelay：往下滚了、或者这一节本来就露在视口里才挂，而且不早于页面打开 3.5 秒', () => {
+  assert.equal(mountDelay({ now: 10000, scrollY: 200, viewportHeight: 900, inView: false }), 0);
+  assert.equal(mountDelay({ now: 1000, scrollY: 200, viewportHeight: 900, inView: false }), MOUNT_AFTER - 1000);
+  // 很高的窗口：首屏底下就露出这一节，不用滚
+  assert.equal(mountDelay({ now: 500, scrollY: 0, viewportHeight: 1500, inView: true }), MOUNT_AFTER - 500);
+  assert.equal(mountDelay({ now: 9000, scrollY: 0, viewportHeight: 1500, inView: true }), 0);
+});
+
+test('mountDelay：一打开就不在首屏（在过闸中间刷新、带着锚点进来）马上挂', () => {
+  assert.equal(mountDelay({ now: 100, scrollY: 3000, viewportHeight: 900, inView: true }), 0);
+  assert.equal(mountDelay({ now: 100, scrollY: 450, viewportHeight: 900, inView: false }), 0);
+});
 
 test('beatAt', () => {
   assert.equal(beatAt(0), 0);

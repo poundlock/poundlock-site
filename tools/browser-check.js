@@ -148,7 +148,7 @@ export const CHECKS = [
     name: 'no-anime',
     viewports: ['1440'],
     async setup({ context }) {
-      await context.route('**/anime.esm.min.js', (route) => route.fulfill({ status: 404, body: 'not found' }));
+      await context.route(/\/anime\.esm\.min\.js(\?|$)/, (route) => route.fulfill({ status: 404, body: 'not found' }));
     },
     async run({ page, url, uncaught, t }) {
       await page.goto(url, { waitUntil: 'load' });
@@ -267,7 +267,7 @@ export const CHECKS = [
             day: root.hasAttribute('data-day'),
             hiddenStages: [...root.querySelectorAll('.lock__water .chamber')].filter((el) => getComputedStyle(el).visibility !== 'visible' || getComputedStyle(el).display === 'none').length,
             overlap: root.querySelector('.lock__water .chamber[data-current]').getBoundingClientRect().bottom - root.querySelector('.lock__water .lock__ledger').getBoundingClientRect().top,
-            tiles: performance.getEntriesByType('resource').filter((e) => /\/assets\/reef\/mid\/\d+\.webp$/.test(e.name)).length,
+            tiles: performance.getEntriesByType('resource').filter((e) => /\/assets\/reef\/mid\/\d+\.webp(\?|$)/.test(e.name)).length,
           };
         });
       await scrollLockTo(page, 0.3);
@@ -299,26 +299,32 @@ export const CHECKS = [
     },
   },
   {
-    // 没滚到过闸之前只下眼前那一两块长条图和鱼，不把十几 MB 都下了；滚进去以后再往前后备几块。
+    // 停在首屏不往下滚：过闸的图一张都不下（原来打开 3.5 秒就下近 3 MB，lock.js 的 mountDelay）。
+    // 往下滚一点才挂上：先下眼前那一两块的预览图和高清图，水母（深水那一段才用）、出水那一截不下；滚进过闸以后再往前后备几块。
     name: 'reef-lazy',
     engines: ['chromium'],
     viewports: ['1440'],
     async run({ page, url }) {
       const got = new Set();
       page.on('request', (request) => {
-        const m = /\/assets\/reef\/(mid|far|above)\/(\d+)(-aux)?\.webp$/.exec(request.url());
-        if (m) got.add(`${m[1]}${m[2]}${m[3] ?? ''}`);
+        const m = /\/assets\/reef\/(?:(mid|far|above)\/(\d+)(-aux|-lo)?|(fish\/\w+|jelly|back))\.webp(?:\?|$)/.exec(request.url());
+        if (m) got.add(m[4] ?? `${m[1]}${m[2]}${m[3] ?? ''}`);
       });
       await page.goto(url, { waitUntil: 'load' });
       const has = await page.evaluate(() => Boolean(document.querySelector('[data-lock-canvas]').dataset.reef));
       if (!has) return;
       await page.waitForTimeout(7000);
-      // 开头那一屏：中景一两块（各带一张辅助图）、远景一块
-      expect(got.size >= 1 && got.size <= 6, `停在首屏七秒，下了 ${got.size} 块长条图：${[...got].join(' ')}`);
-      expect(![...got].some((k) => k.startsWith('above')), '还在首屏就下了出水那一截的图');
+      expect(got.size === 0, `停在首屏七秒没往下滚，就下了 ${got.size} 张过闸的图：${[...got].join(' ')}`);
+      await page.evaluate(() => window.scrollTo({ top: Math.round(window.innerHeight * 0.3), behavior: 'instant' }));
+      await page.waitForTimeout(4000);
+      const first = [...got];
+      expect(first.some((k) => k.endsWith('-lo')), `往下滚了一点，没先下预览图：${first.join(' ')}`);
+      expect(first.includes('mid00'), `往下滚了一点，眼前那块中景没下：${first.join(' ')}`);
+      expect(!first.some((k) => k.startsWith('above')), '还没到过闸就下了出水那一截的图');
+      expect(!first.includes('jelly'), '还没到深水那一段就下了水母');
       await scrollLockTo(page, 0.3);
       await page.waitForTimeout(5000);
-      expect(got.size > 6, `滚进过闸五秒以后才下了 ${got.size} 块，没有往前后备`);
+      expect(got.size > first.length, `滚进过闸五秒以后还是 ${got.size} 张，没有往前后备`);
     },
   },
   {
@@ -495,7 +501,7 @@ export const CHECKS = [
     name: 'lock-broken',
     viewports: ['1440'],
     async setup({ context }) {
-      await context.route('**/scripts/lock.js', (route) =>
+      await context.route(/\/scripts\/lock\.js(\?|$)/, (route) =>
         route.fulfill({ status: 200, contentType: 'text/javascript', body: 'throw new Error("故意弄坏的 lock.js");' }),
       );
     },
@@ -517,7 +523,7 @@ export const CHECKS = [
     name: 'main-broken',
     viewports: ['1440', '360'],
     async setup({ context }) {
-      await context.route('**/scripts/main.js', (route) => route.abort());
+      await context.route(/\/scripts\/main\.js(\?|$)/, (route) => route.abort());
     },
     async run({ page, url, t, engine }) {
       await page.goto(url, { waitUntil: 'load' });
@@ -894,7 +900,7 @@ export const CHECKS = [
           });
         });
       const reserved = await context.newPage();
-      await reserved.route('**/stage/hero-demo.js', () => {});
+      await reserved.route(/\/stage\/hero-demo\.js(\?|$)/, () => {});
       await reserved.goto(url, { waitUntil: 'domcontentloaded' });
       await reserved.waitForTimeout(800);
       const before = await layout(reserved);
@@ -983,7 +989,7 @@ export const CHECKS = [
     name: 'hero-demo-fallback',
     viewports: ['1440', '360'],
     async setup({ context }) {
-      await context.route('**/stage/hero-demo.js', (route) => route.abort());
+      await context.route(/\/stage\/hero-demo\.js(\?|$)/, (route) => route.abort());
     },
     async run({ page, url, uncaught }) {
       await page.goto(url, { waitUntil: 'load' });

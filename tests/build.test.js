@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { build } from '../build.js';
+import { hashOf } from '../src/lib/versions.js';
 
 const SITE_URL = 'https://example.test/x/';
 const REPO_URL = 'https://github.com/poundlock/poundlock-skills';
@@ -154,5 +155,41 @@ test('不指定时，带不带过闸的画面看 src/assets/reef/manifest.json �
       const files = readdirSync(path.join(out, 'assets', 'reef', name));
       for (let k = 0; k < layer.tiles; k++) assert.ok(files.includes(`${String(k).padStart(2, '0')}.webp`), `${name} 缺第 ${k} 块`);
     }
+  }
+});
+
+test('页面引用的样式、脚本、图标带按内容算的版本号（服务器对带版本号的地址发长期缓存）', () => {
+  for (const page of pages) {
+    for (const rel of ['assets/site.css', 'assets/scripts/main.js', 'assets/logo/poundlock-tile.svg']) {
+      const at = page.text.indexOf(`${rel}?v=`);
+      assert.ok(at > 0, `${page.file}：${rel} 没带版本号`);
+      const m = [null, page.text.slice(at + rel.length + 3, at + rel.length + 13)];
+      assert.match(m[1], /^[0-9a-f]{10}$/);
+      const body = readFileSync(path.join(out, rel));
+      assert.equal(m[1], hashOf(body), `${page.file}：${rel} 的版本号和内容对不上`);
+    }
+  }
+});
+
+test('脚本之间的 import 都带版本号，同一个模块各处的地址一样', () => {
+  const scriptsDir = path.join(out, 'assets', 'scripts');
+  const seen = new Map();
+  for (const name of readdirSync(scriptsDir).filter((n) => n.endsWith('.js'))) {
+    const text = readFileSync(path.join(scriptsDir, name), 'utf8');
+    for (const m of text.matchAll(/(['"])(\.\.?\/[^'"\s]+\.(?:js|css))(\?v=[0-9a-f]{10})?\1/g)) {
+      assert.ok(m[3], `${name}：${m[2]} 没带版本号`);
+      const target = path.resolve(scriptsDir, m[2]);
+      if (seen.has(target)) assert.equal(seen.get(target), m[3], `${m[2]} 在不同的地方版本号不一样`);
+      seen.set(target, m[3]);
+    }
+  }
+  assert.ok(seen.size >= 8, `只找到 ${seen.size} 处相对引用`);
+});
+
+test('过闸的清单带每块长条图的版本号，和输出里的文件对得上', () => {
+  if (!existsSync(path.resolve('src', 'assets', 'reef', 'manifest.json'))) return;
+  const data = reefOf(pages[0].text);
+  for (const file of ['mid/00.webp', 'mid/00-aux.webp', 'mid/00-lo.webp', 'far/00.webp', 'above/00.webp', 'back.webp', 'fish/idle.webp', 'fish/swim.webp', 'jelly.webp']) {
+    assert.equal(data.v[file], hashOf(readFileSync(path.join(out, 'assets', 'reef', file))), `${file} 的版本号不对`);
   }
 });

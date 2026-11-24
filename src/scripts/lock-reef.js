@@ -174,6 +174,9 @@ export function createFishBehavior(seed = 7) {
 const RESOLUTION = 0.75;
 // 显卡里最多留几块长条图（中景另带同样多的辅助图）：眼前两块、往前两块、往后一块。一块 2048×1800 要 15 MB 显存
 const TEX_LIMIT = { mid: 5, far: 4 };
+// 下载的先后（数字小的先下，createLoadQueue）：眼前的预览图和水的底色 → 眼前的中景、停着的鱼 → 眼前的远景、辅助图
+// → 游动的鱼、眼前的水母 → 前后几块的预览图 → 前后几块（同时下几张见 mountReef 里的 capacity）
+const PRIO = { viewLo: 0, view: 1, viewMore: 2, extra: 3, aheadLo: 4, ahead: 5 };
 // 出水停下时水线在画面从上往下的哪里（清单里没写就用这个）
 const ABOVE_TO = 0.74;
 
@@ -453,6 +456,83 @@ export function readReef(canvas) {
   }
 }
 
+// 长条图的地址：清单里带了这个文件的版本号（生成时按内容算的，build.js）就加在后面，服务器对带版本号的地址发长期缓存
+export function reefUrl(m, file) {
+  const v = m.v && m.v[file];
+  return `${m.base || ''}${file}${v ? `?v=${v}` : ''}`;
+}
+
+// 下载排队：同时最多 max 个在下，每次挑优先级最高（数字最小）的，一样的按先来后到。
+// 原来眼前要用的那块中景和鱼、水母、远景一起发出去，国内 100 来 KB/s 的线路上它 40 多秒才下完，十五秒的看门狗
+// 先把画面退回了平面图（实测）。现在眼前的先下，别的排着。
+// 每帧 begin()，把这一帧要的逐个 add(key, url, prio)，再 sweep()：这一帧没再要、还没开始下的丢掉
+// （滚得快时一路上经过的块不用都下）；fixed 的（水的底色、鱼）不丢。同一轮里同一个要了两次取优先级高的，新一轮按新的排。
+// capacity(prio)：这个优先级的最多能和几个一起下（给了它就不看 max）。往前备的大图占不满位子，
+// 滚到新一段时眼前要用的不用排在它们后面等十几秒。
+// 在下的、滚过去 staleMs 毫秒没再要的停掉（clock 是毫秒钟，测试里换成假的）：慢的线路上一段段往下滚时，
+// 滚过去的那几块还在下，带宽一直被它们分走（限速 130 KB/s 实测）。fixed 的不停。
+// start(key, url, signal, prio) 开始下一个、返回 promise，结束了（成功失败都算）空出位子接着下。
+// abort() 清空排着的、停掉在下的（画面退回平面图、收起来时：原来退回以后在下的照样下完，白下了 5 MB 多）。纯逻辑，Node 里能测。
+export function createLoadQueue({ start, max = 3, capacity = null, staleMs = Infinity, clock = () => Date.now() }) {
+  const pending = new Map();
+  const inflight = new Map();
+  const room = capacity || (() => max);
+  let round = 0;
+  const pump = () => {
+    while (pending.size) {
+      let pick = null;
+      for (const entry of pending) if (!pick || entry[1].prio < pick[1].prio) pick = entry;
+      const [key, item] = pick;
+      if (inflight.size >= room(item.prio)) return;
+      pending.delete(key);
+      const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+      inflight.set(key, { ctrl, fixed: item.fixed, seenAt: clock() });
+      let run;
+      try {
+        run = Promise.resolve(start(key, item.url, ctrl ? ctrl.signal : undefined, item.prio));
+      } catch (error) {
+        run = Promise.reject(error);
+      }
+      run
+        .catch(() => {})
+        .then(() => {
+          inflight.delete(key);
+          pump();
+        });
+    }
+  };
+  return {
+    has: (key) => pending.has(key) || inflight.has(key),
+    keys: () => [...inflight.keys(), ...pending.keys()],
+    begin() {
+      round++;
+    },
+    add(key, url, prio, fixed = false) {
+      const running = inflight.get(key);
+      if (running) {
+        running.seenAt = clock();
+        return;
+      }
+      const item = pending.get(key);
+      if (!item) pending.set(key, { url, prio, fixed, seen: round });
+      else {
+        item.prio = item.seen === round ? Math.min(item.prio, prio) : prio;
+        item.seen = round;
+      }
+    },
+    sweep() {
+      for (const [key, item] of pending) if (!item.fixed && item.seen !== round) pending.delete(key);
+      const now = clock();
+      for (const run of inflight.values()) if (run.ctrl && !run.fixed && !run.ctrl.signal.aborted && now - run.seenAt > staleMs) run.ctrl.abort();
+      pump();
+    },
+    abort() {
+      pending.clear();
+      for (const run of inflight.values()) if (run.ctrl) run.ctrl.abort();
+    },
+  };
+}
+
 // 返回 { kind: 'reef', frame(progress, now, snap), fill(), destroy() }；拿不到 WebGL、着色器编译不过、没有清单返回 null。
 export function mountReef(root, canvas, { onFail } = {}) {
   const doc = root.ownerDocument;
@@ -470,7 +550,6 @@ export function mountReef(root, canvas, { onFail } = {}) {
   const fxProg = program(gl, FX_VS, FX_FS);
   if (!quadProg || !fxProg) return null;
 
-  const base = m.base || '';
   const uq = uniforms(gl, quadProg, ['u_wl', 'u_aspect', 'u_rot', 'u_half', 'u_rect', 'u_uv', 'u_tex', 'u_aux', 'u_tex2', 'u_mode', 'u_time', 'u_world', 'u_viewH', 'u_sway', 'u_caustic', 'u_water', 'u_mix', 'u_alpha']);
   const uf = uniforms(gl, fxProg, ['u_time', 'u_light', 'u_deep', 'u_res']);
   const aQuad = gl.getAttribLocation(quadProg, 'a_pos');
@@ -482,12 +561,11 @@ export function mountReef(root, canvas, { onFail } = {}) {
   const MAX_FX = 420;
   const fxData = new Float32Array(MAX_FX * 6 * 8);
 
-  // —— 贴图：按需下、一帧最多传一张进显卡、超过上限就丢掉最久没用的 ——
+  // —— 贴图：排队下（眼前的先下，createLoadQueue）、一帧最多传一张进显卡、超过上限就丢掉最久没用的 ——
   const textures = new Map();
-  const loading = new Set();
   const ready = [];
   let dead = false;
-  // 长条图一块都下不来（断网、被拦、文件缺）：失败了几次、或者在视口里干等了十五秒还没有一块中景，就交给 onFail 退回平面图
+  // 长条图一块都下不来（断网、被拦、文件缺）：失败了几次、或者在视口里干等了十五秒还没有一块中景（预览图也算），就交给 onFail 退回平面图
   let failures = 0;
   let firstShown = false;
   let waited = 0;
@@ -505,11 +583,10 @@ export function mountReef(root, canvas, { onFail } = {}) {
   const closeItem = (item) => {
     for (const piece of item.pieces || []) if (piece.close) piece.close();
   };
-  const request = (key, url) => {
-    if (textures.has(key) || loading.has(key) || queued.has(key) || dead) return;
-    loading.add(key);
+  let job = null;
+  // 下一张、解码、切条；结束了（成功、失败、被取消）promise 才落定，排队那边空出位子
+  const fetchOne = (key, url, signal, prio) => {
     const done = (item) => {
-      loading.delete(key);
       if (dead) {
         closeItem(item);
         return;
@@ -517,13 +594,13 @@ export function mountReef(root, canvas, { onFail } = {}) {
       queued.add(key);
       ready.push(item);
     };
+    // 被取消的（滚过去了、画面收起来了）不算下不来
     const failed = () => {
-      loading.delete(key);
-      failures++;
+      if (!dead && !(signal && signal.aborted)) failures++;
     };
     if (bitmaps) {
-      win
-        .fetch(url)
+      return win
+        .fetch(url, { signal, priority: prio <= PRIO.view ? 'high' : 'low' })
         .then((res) => (res.ok ? res.blob() : Promise.reject(new Error(String(res.status)))))
         .then((blob) => win.createImageBitmap(blob, { premultiplyAlpha: 'premultiply' }))
         .then((whole) => {
@@ -537,17 +614,40 @@ export function mountReef(root, canvas, { onFail } = {}) {
           });
         })
         .then(done, failed);
-      return;
     }
-    const img = new win.Image();
-    img.decoding = 'async';
-    img.src = url;
-    const ok = () => done({ key, img, w: img.naturalWidth, h: img.naturalHeight });
-    if (img.decode) img.decode().then(ok, failed);
-    else {
-      img.onload = ok;
-      img.onerror = failed;
-    }
+    return new Promise((resolve) => {
+      const img = new win.Image();
+      img.decoding = 'async';
+      const ok = () => {
+        done({ key, img, w: img.naturalWidth, h: img.naturalHeight });
+        resolve();
+      };
+      const bad = () => {
+        failed();
+        resolve();
+      };
+      if (signal) signal.addEventListener('abort', () => img.removeAttribute('src'));
+      img.src = url;
+      if (img.decode) img.decode().then(ok, bad);
+      else {
+        img.onload = ok;
+        img.onerror = bad;
+      }
+    });
+  };
+  // 同时下几张（算的是一共在下的张数）：预览图小，最多六张一起；眼前的高清图、鱼两张（一起下得多，每张都分不到多少带宽，
+  // 鱼和眼前那块都来得晚）；往前备的预览图三张；往前备的高清图只在别的都下完了才开始，一次一张，眼前的随时有位子。
+  // 滚过去 1.5 秒还没下完的停掉。
+  const queue = createLoadQueue({
+    start: fetchOne,
+    capacity: (prio) => (prio === PRIO.viewLo ? 6 : prio === PRIO.aheadLo ? 3 : prio === PRIO.ahead ? 1 : 2),
+    staleMs: 1500,
+    clock: () => win.performance.now(),
+  });
+  // 已经有了、下完等着传、正在一条条传进显卡（原来漏了这一种：传的那几帧里又要了一遍，同一张图下两次）、在排队的，都不再要
+  const request = (key, url, prio, fixed = false) => {
+    if (dead || textures.has(key) || queued.has(key) || (job && job.key === key)) return;
+    queue.add(key, url, prio, fixed);
   };
   const newTexture = () => {
     const tex = gl.createTexture();
@@ -558,16 +658,17 @@ export function mountReef(root, canvas, { onFail } = {}) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     return tex;
   };
-  let job = null;
   const upload = () => {
     if (!job) {
-      // 先传眼前要用的（want 里标了的），别的往后排
-      let at = ready.findIndex((r) => needed.has(r.key));
+      // 先传眼前要用的（want 里标了的），眼前的预览图最先（只有一条，一帧就传完）；别的往后排
+      let at = ready.findIndex((r) => needed.has(r.key) && r.key.endsWith('-lo'));
+      if (at < 0) at = ready.findIndex((r) => needed.has(r.key));
       if (at < 0) at = 0;
       const item = ready.splice(at, 1)[0];
       if (!item) return;
       queued.delete(item.key);
-      if (textures.has(item.key)) {
+      // 已经有了；或者是预览图、而高清的已经传进去了：不用再传
+      if (textures.has(item.key) || (item.key.endsWith('-lo') && textures.has(item.key.slice(0, -3)))) {
         closeItem(item);
         return;
       }
@@ -593,6 +694,12 @@ export function mountReef(root, canvas, { onFail } = {}) {
       job = null;
     }
   };
+  const drop = (key) => {
+    const t = textures.get(key);
+    if (!t) return;
+    gl.deleteTexture(t.tex);
+    textures.delete(key);
+  };
   const evict = (prefix, keep, limit) => {
     // 排着队等传、但已经不在要留的范围里的，从队里拿掉（滚得快时这一路上经过的块不用都传一遍）
     for (let i = ready.length - 1; i >= 0; i--) {
@@ -601,13 +708,12 @@ export function mountReef(root, canvas, { onFail } = {}) {
         closeItem(ready.splice(i, 1)[0]);
       }
     }
+    // 预览图不在要留的范围里就删；高清的（连辅助图）超过上限才删最久没用的
+    for (const key of [...textures.keys()]) if (key.startsWith(prefix) && key.endsWith('-lo') && !keep.has(key)) drop(key);
     const own = [...textures.entries()].filter(([k]) => k.startsWith(prefix) && !keep.has(k));
-    const count = [...textures.keys()].filter((k) => k.startsWith(prefix)).length;
+    const count = [...textures.keys()].filter((k) => k.startsWith(prefix) && !k.endsWith('-lo')).length;
     own.sort((a, b) => a[1].used - b[1].used);
-    for (let i = 0; i < count - limit && i < own.length; i++) {
-      gl.deleteTexture(own[i][1].tex);
-      textures.delete(own[i][0]);
-    }
+    for (let i = 0; i < count - limit && i < own.length; i++) drop(own[i][0]);
   };
   const tex = (key) => {
     const t = textures.get(key);
@@ -617,46 +723,69 @@ export function mountReef(root, canvas, { onFail } = {}) {
   };
 
   const tileKey = (layer, i, aux = false) => `${layer}:${String(i).padStart(2, '0')}${aux ? '-aux' : ''}`;
-  const tileUrl = (layer, i, aux = false) => `${base}${layer}/${String(i).padStart(2, '0')}${aux ? '-aux' : ''}.webp`;
-  request('back', `${base}back.webp`);
-  request('fish:idle', `${base}fish/idle.webp`);
-  request('fish:swim', `${base}fish/swim.webp`);
-  if (m.jelly) request('jelly', `${base}jelly.webp`);
+  const loKey = (layer, i) => `${tileKey(layer, i)}-lo`;
+  const tileFile = (layer, i, suffix = '') => `${layer}/${String(i).padStart(2, '0')}${suffix}.webp`;
+  // 这一块现在拿什么画：高清的到了用高清的，没到先用预览图
+  const tileTex = (layer, i) => tex(tileKey(layer, i)) || tex(loKey(layer, i));
+  request('back', reefUrl(m, 'back.webp'), PRIO.viewLo, true);
+  request('fish:idle', reefUrl(m, 'fish/idle.webp'), PRIO.view, true);
+  request('fish:swim', reefUrl(m, 'fish/swim.webp'), PRIO.extra, true);
+  queue.sweep();
   const jellies = [];
   const fishGrid = m.fish || { cols: 6, rows: 4, frames: 24, len: 0.3 };
 
   let filling = false;
   const needed = new Set();
+  // 要一块：清单说有预览图、高清的还没传进显卡时，先要预览图（四分之一大小，二三十 KB）；高清的到了就把预览图删掉
+  const ask = (name, i, view, keep) => {
+    const layer = m.layers[name];
+    const key = tileKey(name, i);
+    keep.add(key);
+    if (m.preview) {
+      const lo = loKey(name, i);
+      if (textures.has(key)) drop(lo);
+      else {
+        keep.add(lo);
+        if (view) needed.add(lo);
+        request(lo, reefUrl(m, tileFile(name, i, '-lo')), view ? PRIO.viewLo : PRIO.aheadLo);
+      }
+    }
+    if (view) needed.add(key);
+    request(key, reefUrl(m, tileFile(name, i)), view ? (name === 'mid' ? PRIO.view : PRIO.viewMore) : PRIO.ahead);
+    if (layer.aux) {
+      const aux = tileKey(name, i, true);
+      keep.add(aux);
+      if (view) needed.add(aux);
+      request(aux, reefUrl(m, tileFile(name, i, '-aux')), view ? PRIO.viewMore : PRIO.ahead);
+    }
+  };
   const want = (camX, aspect, dir) => {
     needed.clear();
-    const keep = { mid: new Set(), far: new Set() };
+    queue.begin();
     for (const name of ['far', 'mid']) {
       const layer = m.layers[name];
+      const keep = new Set();
       const [a, b] = visibleTiles(layer, camX, aspect, m.viewH);
-      const ahead = dir >= 0 ? [b + 1, b + 2, a - 1] : [a - 1, a - 2, b + 1];
-      for (const i of [...Array(b - a + 1).keys()].map((n) => a + n).concat(filling ? ahead : [])) {
-        if (i < 0 || i >= layer.tiles) continue;
-        if (i >= a && i <= b) {
-          needed.add(tileKey(name, i));
-          needed.add(tileKey(name, i, true));
-        }
-        keep[name].add(tileKey(name, i));
-        request(tileKey(name, i), tileUrl(name, i));
-        if (layer.aux) {
-          keep[name].add(tileKey(name, i, true));
-          request(tileKey(name, i, true), tileUrl(name, i, true));
-        }
-      }
-      evict(`${name}:`, keep[name], TEX_LIMIT[name] * (layer.aux ? 2 : 1));
+      for (let i = a; i <= b; i++) ask(name, i, true, keep);
+      if (filling) for (const i of dir >= 0 ? [b + 1, b + 2, a - 1] : [a - 1, a - 2, b + 1]) if (i >= 0 && i < layer.tiles) ask(name, i, false, keep);
+      evict(`${name}:`, keep, TEX_LIMIT[name] * (layer.aux ? 2 : 1));
     }
     const above = m.layers.above;
-    if (above && (aboveAt(camX + 1.2, m) > 0 || filling)) {
-      const [a, b] = visibleTiles(above, camX, aspect, m.viewH);
-      for (let i = a; i <= b; i++) {
-        needed.add(tileKey('above', i));
-        request(tileKey('above', i), tileUrl('above', i));
+    if (above) {
+      const keep = new Set();
+      if (aboveAt(camX + 1.2, m) > 0) {
+        const [a, b] = visibleTiles(above, camX, aspect, m.viewH);
+        for (let i = a; i <= b; i++) ask('above', i, true, keep);
+      } else if (filling && camX > m.xEnd - m.sceneLen) {
+        for (let i = 0; i < above.tiles; i++) ask('above', i, false, keep);
       }
     }
+    // 水母只在深水那一段：快到了才下（原来一挂上就下，555 KB 跟眼前那块抢带宽）
+    if (m.jelly) {
+      if (effectsAt(camX, m).jelly > 0.02) request('jelly', reefUrl(m, 'jelly.webp'), PRIO.extra);
+      else if (filling && effectsAt(camX + m.sceneLen, m).jelly > 0) request('jelly', reefUrl(m, 'jelly.webp'), PRIO.ahead);
+    }
+    queue.sweep();
   };
 
   const headerVars = styleWriter(doc.querySelector('[data-header]'));
@@ -671,6 +800,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
   const fail = () => {
     if (dead) return;
     dead = true;
+    queue.abort();
     if (onFail) onFail();
   };
   // 帧率看门狗放宽一点：长条图一块块传进显卡时会掉几帧，别因为这个就退回平面图
@@ -892,7 +1022,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
       gl.uniform1f(uq.u_sway, eff.sway);
       gl.uniform1f(uq.u_caustic, eff.caustic * (name === 'mid' ? 1 : 0));
       for (let i = a; i <= b; i++) {
-        const t = tex(tileKey(name, i));
+        const t = tileTex(name, i);
         if (!t) continue;
         const wx0 = layer.x0 + i * layer.tileM;
         const x0 = W / 2 + (wx0 - camX) * scale;
@@ -926,7 +1056,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
     gl.uniform1f(uq.u_aspect, W / H);
     const [a, b] = visibleTiles(layer, camX, W / H, m.viewH);
     for (let i = a; i <= b; i++) {
-      const t = tex(tileKey('above', i));
+      const t = tileTex('above', i);
       if (!t) continue;
       const x0 = W / 2 + (layer.x0 + i * layer.tileM - camX) * scale;
       const x1 = x0 + layer.tileM * scale;
@@ -938,8 +1068,9 @@ export function mountReef(root, canvas, { onFail } = {}) {
 
   const drawFish = (pose, water, above, dy) => {
     const idle = tex('fish:idle');
-    const swim = tex('fish:swim');
-    if (!idle || !swim) return;
+    // 游动的那套还没下完时先拿停着的那套顶上（国内慢的线路上鱼能早一点出来）
+    const swim = tex('fish:swim') || idle;
+    if (!idle) return;
     const W = canvas.width;
     const H = canvas.height;
     const frames = fishGrid.frames;
@@ -1027,7 +1158,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
 
   canvas.dataset.filmKind = 'reef';
   // 给核对和排错用：现在显卡里有哪几张图、还有几张在下、几张下完等着传
-  canvas.reefDebug = () => ({ textures: [...textures.keys()], loading: [...loading], ready: ready.map((r) => r.key), failures });
+  canvas.reefDebug = () => ({ textures: [...textures.keys()], loading: queue.keys(), ready: ready.map((r) => r.key), failures });
 
   return {
     kind: 'reef',
@@ -1069,7 +1200,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
       drawAbove(camX, dy, above);
 
       canvas.dataset.want = shown.toFixed(4);
-      if (tex(tileKey('mid', visibleTiles(m.layers.mid, camX, aspect, m.viewH)[0]))) {
+      if (tileTex('mid', visibleTiles(m.layers.mid, camX, aspect, m.viewH)[0])) {
         firstShown = true;
         if (!root.hasAttribute('data-lock-film-ready')) root.setAttribute('data-lock-film-ready', '');
       } else if (!firstShown) {
@@ -1086,6 +1217,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
     },
     destroy() {
       dead = true;
+      queue.abort();
       watchdog.stop();
       canvas.removeEventListener('webglcontextlost', onLost);
       for (const t of textures.values()) gl.deleteTexture(t.tex);

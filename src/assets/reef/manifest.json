@@ -90,5 +90,8 @@
   "cols": 4,
   "rows": 4,
   "frames": 16
+ },
+ "preview": {
+  "scale": 0.25
  }
 }

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
-import { momentumStep, MOMENTUM_RISE, MOMENTUM_FALL, REEF_FOLLOW, cameraX, presence, visibleTiles, aboveAt, effectsAt, waterAt, readReef, createFishBehavior } from '../src/scripts/lock-reef.js';
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import { momentumStep, MOMENTUM_RISE, MOMENTUM_FALL, REEF_FOLLOW, cameraX, presence, visibleTiles, aboveAt, effectsAt, waterAt, readReef, createFishBehavior, createLoadQueue, reefUrl } from '../src/scripts/lock-reef.js';
 import { FOLLOW } from '../src/scripts/lock.js';
 
 const DT = 1 / 120;
@@ -116,6 +116,22 @@ test('仓库里的清单和 tools/reef/journey.py 的排法、文件对得上', 
   for (const act of ['idle', 'swim']) assert.ok(existsSync(`src/assets/reef/fish/${act}.webp`));
 });
 
+test('每块长条图都有一张小的预览图（tools/reef/preview.py），清单写着 preview', () => {
+  const file = 'src/assets/reef/manifest.json';
+  if (!existsSync(file)) return;
+  const m = JSON.parse(readFileSync(file, 'utf8'));
+  assert.ok(m.preview, '清单里没有 preview：重跑 python -I tools/reef/preview.py');
+  for (const name of ['far', 'mid', 'above']) {
+    const layer = m.layers[name];
+    if (!layer) continue;
+    for (let i = 0; i < layer.tiles; i++) {
+      const lo = `src/assets/reef/${name}/${String(i).padStart(2, '0')}-lo.webp`;
+      assert.ok(existsSync(lo), `${lo} 不在`);
+      assert.ok(statSync(lo).size < 80 * 1024, `${lo} 有 ${Math.round(statSync(lo).size / 1024)} KB，预览图太大`);
+    }
+  }
+});
+
 test('鱼游来游去、窜来窜去，不越过左边那条线（宽屏上说明那一栏的右边），也不越过右边', () => {
   for (const seed of [3, 7, 11]) {
     const step = createFishBehavior(seed);
@@ -131,4 +147,136 @@ test('鱼游来游去、窜来窜去，不越过左边那条线（宽屏上说�
     assert.ok(minX >= 0.1, `种子 ${seed}：鱼游到了 ${minX.toFixed(3)}，越过了左边 0.11`);
     assert.ok(maxX <= 0.33, `种子 ${seed}：鱼游到了 ${maxX.toFixed(3)}，出了右边`);
   }
+});
+
+// 下载排队用的假 start：记下开始了哪几个，由测试决定哪个下完
+function fakeStarts() {
+  const started = [];
+  const finish = {};
+  const signals = {};
+  const start = (key, url, signal) => {
+    started.push(key);
+    signals[key] = signal;
+    return new Promise((resolve) => {
+      finish[key] = resolve;
+    });
+  };
+  return { started, finish, signals, start };
+}
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test('下载排队：同时最多 max 个，优先级数字小的先下，一样的按先来后到', async () => {
+  const f = fakeStarts();
+  const q = createLoadQueue({ start: f.start, max: 2 });
+  q.begin();
+  q.add('fish', 'f', 3);
+  q.add('mid:00', 'm', 1);
+  q.add('mid:00-lo', 'l', 0);
+  q.add('far:00', 'r', 1);
+  q.sweep();
+  assert.deepEqual(f.started, ['mid:00-lo', 'mid:00']);
+  assert.ok(q.has('fish') && q.has('mid:00'));
+  f.finish['mid:00-lo']();
+  await settle();
+  assert.deepEqual(f.started, ['mid:00-lo', 'mid:00', 'far:00']);
+  assert.ok(!q.has('mid:00-lo'));
+});
+
+test('下载排队：这一轮没再要、还没开始下的丢掉（滚过去的块不下），fixed 的留着；新一轮按新的优先级排', async () => {
+  const f = fakeStarts();
+  const q = createLoadQueue({ start: f.start, max: 1 });
+  q.begin();
+  q.add('busy', 'b', 0);
+  q.add('back', 'k', 0, true);
+  q.add('mid:05', 'a', 5);
+  q.add('mid:06', 'c', 5);
+  q.sweep();
+  assert.deepEqual(f.started, ['busy']);
+  q.begin();
+  q.add('mid:06', 'c', 1);
+  q.sweep();
+  assert.ok(!q.has('mid:05'), '滚过去了还留在队里');
+  assert.ok(q.has('back'));
+  f.finish.busy();
+  await settle();
+  assert.deepEqual(f.started, ['busy', 'back']);
+  f.finish.back();
+  await settle();
+  assert.deepEqual(f.started, ['busy', 'back', 'mid:06']);
+});
+
+test('下载排队：同一轮里同一个要了两次取优先级高的；下失败了也空出位子', async () => {
+  const f = fakeStarts();
+  const q = createLoadQueue({
+    start: (key, url, signal) => (key === 'bad' ? Promise.reject(new Error('404')) : f.start(key, url, signal)),
+    max: 1,
+  });
+  q.begin();
+  q.add('bad', 'x', 0);
+  q.add('a', 'a', 5);
+  q.add('a', 'a', 2);
+  q.add('b', 'b', 3);
+  q.sweep();
+  await settle();
+  assert.deepEqual(f.started, ['a']);
+});
+
+test('下载排队：abort 清空排着的、停掉在下的', async () => {
+  const f = fakeStarts();
+  const q = createLoadQueue({ start: f.start, max: 2 });
+  q.begin();
+  for (const key of ['a', 'b', 'c']) q.add(key, key, 0);
+  q.sweep();
+  q.abort();
+  assert.ok(f.signals.a && f.signals.a.aborted && f.signals.b.aborted);
+  assert.ok(!q.has('c'));
+  f.finish.a();
+  f.finish.b();
+  await settle();
+  assert.deepEqual(f.started, ['a', 'b']);
+  assert.deepEqual(q.keys(), []);
+});
+
+test('reefUrl：清单里带了这个文件的版本号就加在地址后面，没带就照原样', () => {
+  assert.equal(reefUrl({ base: 'assets/reef/' }, 'mid/00.webp'), 'assets/reef/mid/00.webp');
+  assert.equal(reefUrl({ base: '../assets/reef/', v: { 'mid/00.webp': 'abc123' } }, 'mid/00.webp'), '../assets/reef/mid/00.webp?v=abc123');
+  assert.equal(reefUrl({ v: {} }, 'back.webp'), 'back.webp');
+});
+
+test('下载排队：往前备的（低优先级）占不满位子，滚到新一段时眼前要用的不用等它们下完', async () => {
+  const f = fakeStarts();
+  const q = createLoadQueue({ start: f.start, capacity: (prio) => (prio >= 5 ? 2 : 4) });
+  q.begin();
+  for (const key of ['n1', 'n2', 'n3']) q.add(key, key, 5);
+  q.sweep();
+  assert.deepEqual(f.started, ['n1', 'n2'], '往前备的占了两个以上的位子');
+  q.begin();
+  q.add('v-lo', 'v', 0);
+  q.add('v', 'v', 1);
+  q.add('n3', 'n3', 5);
+  q.sweep();
+  assert.deepEqual(f.started, ['n1', 'n2', 'v-lo', 'v']);
+});
+
+test('下载排队：滚过去 staleMs 还没下完的停掉（带宽让给眼前的），又要回来的和 fixed 的不停', async () => {
+  const f = fakeStarts();
+  let now = 0;
+  const q = createLoadQueue({ start: f.start, max: 4, staleMs: 1500, clock: () => now });
+  q.begin();
+  q.add('passed', 'p', 5);
+  q.add('back', 'b', 0, true);
+  q.add('kept', 'k', 1);
+  q.sweep();
+  assert.deepEqual(f.started, ['back', 'kept', 'passed']);
+  now = 1000;
+  q.begin();
+  q.add('kept', 'k', 1);
+  q.sweep();
+  assert.ok(!f.signals.passed.aborted, '才滚过去一秒就停了');
+  now = 2000;
+  q.begin();
+  q.add('kept', 'k', 1);
+  q.sweep();
+  assert.ok(f.signals.passed.aborted, '滚过去两秒了还在下');
+  assert.ok(!f.signals.kept.aborted && !f.signals.back.aborted);
 });

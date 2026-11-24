@@ -2,12 +2,13 @@
 //   node build.js            生成到 dist/（先清空 dist/）
 //   build({ outDir, ... })   给测试和部署脚本用；它只往 outDir 里写，从不删东西
 
-import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './site.config.js';
 import { renderPage } from './src/page.js';
+import { hashOf, versionAssets } from './src/lib/versions.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(ROOT, 'src');
@@ -23,9 +24,19 @@ const COPIES = [
 ];
 
 // 过闸那一节的画面清单（tools/reef/encode.py 写的）。没有这个文件，页面就不带这一路画面。
+// 清单里再带上每张图的版本号（v：相对 reef/ 的路径 → 内容哈希），页面取图时加在地址后面（lock-reef.js 的 reefUrl）。
 async function loadReef() {
-  const file = path.join(SRC, 'assets', 'reef', 'manifest.json');
-  return existsSync(file) ? JSON.parse(await readFile(file, 'utf8')) : null;
+  const dir = path.join(SRC, 'assets', 'reef');
+  const file = path.join(dir, 'manifest.json');
+  if (!existsSync(file)) return null;
+  const manifest = JSON.parse(await readFile(file, 'utf8'));
+  const v = {};
+  for (const entry of await readdir(dir, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.webp')) continue;
+    const full = path.join(entry.parentPath ?? entry.path, entry.name);
+    v[path.relative(dir, full).split(path.sep).join('/')] = hashOf(await readFile(full));
+  }
+  return { ...manifest, v };
 }
 
 async function loadCopy(code) {
@@ -66,6 +77,8 @@ export async function build({ outDir = 'dist', siteUrl = config.siteUrl, version
     await writeFile(path.join(dir, 'index.html'), renderPage(ctx));
     pages.push(`${lang.path}index.html`);
   }
+  // 页面、样式、脚本里引用的资源都换成带版本号的地址（src/lib/versions.js）
+  await versionAssets(out, pages);
 
   await writeFile(path.join(out, 'version.json'), JSON.stringify({ version, commit, builtAt: new Date().toISOString() }) + '\n');
   await writeFile(path.join(out, '.nojekyll'), '');
