@@ -267,7 +267,7 @@ export const CHECKS = [
             day: root.hasAttribute('data-day'),
             hiddenStages: [...root.querySelectorAll('.lock__water .chamber')].filter((el) => getComputedStyle(el).visibility !== 'visible' || getComputedStyle(el).display === 'none').length,
             overlap: root.querySelector('.lock__water .chamber[data-current]').getBoundingClientRect().bottom - root.querySelector('.lock__water .lock__ledger').getBoundingClientRect().top,
-            tiles: performance.getEntriesByType('resource').filter((e) => /\/assets\/reef\/mid\/\d+\.webp(\?|$)/.test(e.name)).length,
+            tiles: performance.getEntriesByType('resource').filter((e) => /\/assets\/reef\/mid\/\d+(-md)?\.webp(\?|$)/.test(e.name)).length,
           };
         });
       await scrollLockTo(page, 0.3);
@@ -307,7 +307,7 @@ export const CHECKS = [
     async run({ page, url }) {
       const got = new Set();
       page.on('request', (request) => {
-        const m = /\/assets\/reef\/(?:(mid|far|above)\/(\d+)(-aux|-lo)?|(fish\/\w+|jelly|back))\.webp(?:\?|$)/.exec(request.url());
+        const m = /\/assets\/reef\/(?:(mid|far|above)\/(\d+)(-aux|-lo|-md)?|(fish\/\w+|jelly|back)(?:-md)?)\.webp(?:\?|$)/.exec(request.url());
         if (m) got.add(m[4] ?? `${m[1]}${m[2]}${m[3] ?? ''}`);
       });
       await page.goto(url, { waitUntil: 'load' });
@@ -319,7 +319,9 @@ export const CHECKS = [
       await page.waitForTimeout(4000);
       const first = [...got];
       expect(first.some((k) => k.endsWith('-lo')), `往下滚了一点，没先下预览图：${first.join(' ')}`);
-      expect(first.includes('mid00'), `往下滚了一点，眼前那块中景没下：${first.join(' ')}`);
+      // 1440×900 的画布不到 1200 像素高，下的是半分辨率的那套（-md）
+      expect(first.includes('mid00-md'), `往下滚了一点，眼前那块中景（半分辨率的）没下：${first.join(' ')}`);
+      expect(!first.includes('mid00'), `画布不大，却下了原图：${first.join(' ')}`);
       expect(!first.some((k) => k.startsWith('above')), '还没到过闸就下了出水那一截的图');
       expect(!first.includes('jelly'), '还没到深水那一段就下了水母');
       await scrollLockTo(page, 0.3);

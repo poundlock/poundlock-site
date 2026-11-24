@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, statSync } from 'node:fs';
-import { momentumStep, MOMENTUM_RISE, MOMENTUM_FALL, REEF_FOLLOW, cameraX, presence, visibleTiles, aboveAt, effectsAt, waterAt, readReef, createFishBehavior, createLoadQueue, reefUrl } from '../src/scripts/lock-reef.js';
-import { FOLLOW } from '../src/scripts/lock.js';
+import { momentumStep, MOMENTUM_RISE, MOMENTUM_FALL, REEF_FOLLOW, cameraX, presence, visibleTiles, aboveAt, effectsAt, waterAt, readReef, createFishBehavior, createLoadQueue, reefUrl, tierOf, HALF_MAX, stopXs, aheadTiles } from '../src/scripts/lock-reef.js';
+import { FOLLOW, stopsOf } from '../src/scripts/lock.js';
 
 const DT = 1 / 120;
 
@@ -116,11 +116,11 @@ test('仓库里的清单和 tools/reef/journey.py 的排法、文件对得上', 
   for (const act of ['idle', 'swim']) assert.ok(existsSync(`src/assets/reef/fish/${act}.webp`));
 });
 
-test('每块长条图都有一张小的预览图（tools/reef/preview.py），清单写着 preview', () => {
+test('每块长条图都有一张小的预览图（tools/reef/downsize.py），清单写着 preview', () => {
   const file = 'src/assets/reef/manifest.json';
   if (!existsSync(file)) return;
   const m = JSON.parse(readFileSync(file, 'utf8'));
-  assert.ok(m.preview, '清单里没有 preview：重跑 python -I tools/reef/preview.py');
+  assert.ok(m.preview, '清单里没有 preview：重跑 python -I tools/reef/downsize.py');
   for (const name of ['far', 'mid', 'above']) {
     const layer = m.layers[name];
     if (!layer) continue;
@@ -279,4 +279,62 @@ test('下载排队：滚过去 staleMs 还没下完的停掉（带宽让给眼�
   q.sweep();
   assert.ok(f.signals.passed.aborted, '滚过去两秒了还在下');
   assert.ok(!f.signals.kept.aborted && !f.signals.back.aborted);
+});
+
+test('tierOf：画布不到 HALF_MAX 像素高用半分辨率的，大屏用原图；清单里没有半分辨率的一律原图', () => {
+  const m = { half: { scale: 0.5 } };
+  assert.equal(tierOf(m, 713), '-md');
+  assert.equal(tierOf(m, HALF_MAX), '-md');
+  assert.equal(tierOf(m, HALF_MAX + 1), '');
+  assert.equal(tierOf(m, 1410), '');
+  assert.equal(tierOf({}, 713), '');
+  // 半分辨率的长条图 900 像素高：放大不超过三分之一
+  assert.ok(HALF_MAX / 900 <= 1.34);
+});
+
+test('stopXs：滚轮的每个停点镜头在哪，和 lock.js 的停点对得上', () => {
+  const xs = stopXs(M);
+  const stops = stopsOf(M);
+  assert.equal(xs.length, stops.length);
+  for (let i = 0; i < xs.length; i++) assert.ok(Math.abs(xs[i] - cameraX(stops[i], M)) < 1e-9, `第 ${i} 个停点`);
+});
+
+test('aheadTiles：往下一段走，要备的是眼前那几块之后、一直到下一段眼前的那几块，近的在前', () => {
+  const xs = stopXs(M);
+  const aspect = 2;
+  for (let k = 0; k < xs.length - 1; k++) {
+    const [a, b] = visibleTiles(M.layers.mid, xs[k], aspect, M.viewH);
+    const [na, nb] = visibleTiles(M.layers.mid, xs[k + 1], aspect, M.viewH);
+    const got = aheadTiles(M.layers.mid, xs[k], xs[k + 1], aspect, M.viewH);
+    const want = [];
+    for (let i = b + 1; i <= nb; i++) want.push(i);
+    assert.deepEqual(got, want, `第 ${k} 段往下`);
+    // 下一段眼前的都在：要么现在就在眼前，要么在备的里面
+    for (let i = na; i <= nb; i++) assert.ok((i >= a && i <= b) || got.includes(i), `第 ${k} 段往下漏了第 ${i} 块`);
+  }
+  // 往回走：近的在前
+  const back = aheadTiles(M.layers.mid, xs[4], xs[3], aspect, M.viewH);
+  assert.ok(back.length > 0);
+  for (let i = 1; i < back.length; i++) assert.ok(back[i] < back[i - 1]);
+  // 到头了（没有下一个停点）不备
+  assert.deepEqual(aheadTiles(M.layers.mid, xs[7], null, aspect, M.viewH), []);
+  // 远景走得慢：下一段眼前的远景多半现在就在眼前，备得少
+  assert.ok(aheadTiles(M.layers.far, xs[2], xs[3], aspect, M.viewH).length <= 1);
+});
+
+test('仓库里每块长条图都有半分辨率的，鱼和水母也有，清单写着 half', () => {
+  const file = 'src/assets/reef/manifest.json';
+  if (!existsSync(file)) return;
+  const m = JSON.parse(readFileSync(file, 'utf8'));
+  assert.ok(m.half, '清单里没有 half：重跑 python -I tools/reef/downsize.py');
+  for (const name of ['far', 'mid', 'above']) {
+    const layer = m.layers[name];
+    if (!layer) continue;
+    for (let i = 0; i < layer.tiles; i++) {
+      const stem = `src/assets/reef/${name}/${String(i).padStart(2, '0')}`;
+      assert.ok(existsSync(`${stem}-md.webp`), `${name} 第 ${i} 块没有半分辨率的`);
+      if (layer.aux) assert.ok(existsSync(`${stem}-aux-md.webp`), `${name} 第 ${i} 块没有半分辨率那套的辅助图`);
+    }
+  }
+  for (const sprite of ['fish/idle', 'fish/swim', 'jelly']) assert.ok(existsSync(`src/assets/reef/${sprite}-md.webp`), `${sprite}-md.webp 不在`);
 });

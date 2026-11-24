@@ -93,5 +93,9 @@
  },
  "preview": {
   "scale": 0.25
+ },
+ "half": {
+  "scale": 0.5,
+  "sprites": 0.75
  }
 }

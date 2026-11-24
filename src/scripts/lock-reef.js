@@ -56,6 +56,33 @@ export function visibleTiles(layer, camX, aspect, viewH) {
   return [Math.max(0, a), Math.min(layer.tiles - 1, b)];
 }
 
+// 用哪一套长条图：画布不到 HALF_MAX 像素高（常见的笔记本、手机）用半分辨率的（后缀 -md，900 像素高，tools/reef/downsize.py），
+// 大屏用原图（1800 像素高）。常见 1080p 笔记本上画布只有 700 来像素高，原图的像素用不到两成；
+// 国内的线路上（实测 150 KB/s 上下）一段的原图要十来秒，半分辨率的三四秒。清单里没有半分辨率的就一律原图。
+export const HALF_MAX = 1200;
+export function tierOf(m, canvasHeight) {
+  return m.half && canvasHeight <= HALF_MAX ? '-md' : '';
+}
+
+// 滚轮的每个停点镜头在哪（米）：第一段停在开头、最后一段停在终点（出水那一幅），中间的停在每段场景的正中。
+// 和 lock.js 的 stopsOf 是同一套停点（那边是进度，这边是镜头位置；tests 核两边对得上）。
+export function stopXs(m) {
+  const n = m.scenes.length;
+  return m.scenes.map((_, i) => (i === 0 ? m.xStart : i === n - 1 ? m.xEnd : (i + 0.5) * m.sceneLen));
+}
+
+// 从眼前（镜头在 camX）往下一个停点（nextX）走，这一层要预备哪几块：眼前那几块之后、一直到下一段眼前的那几块，近的在前。
+// 没有下一个停点（到头了）不备。访客停在一段上读字的时候把下一段整段备好，滚过去就是清楚的。
+export function aheadTiles(layer, camX, nextX, aspect, viewH) {
+  if (nextX === null || nextX === undefined) return [];
+  const [a, b] = visibleTiles(layer, camX, aspect, viewH);
+  const [na, nb] = visibleTiles(layer, nextX, aspect, viewH);
+  const out = [];
+  if (nextX > camX) for (let i = b + 1; i <= nb; i++) out.push(i);
+  else for (let i = a - 1; i >= na; i--) out.push(i);
+  return out;
+}
+
 // 出水：路线最后 1.4 米（镜头中心）里水线从画面上方扫下来，0 是水下、1 是水面以上
 export function aboveAt(camX, m) {
   return smooth((camX - (m.xEnd - 1.4)) / 1.2);
@@ -175,8 +202,8 @@ const RESOLUTION = 0.75;
 // 显卡里最多留几块长条图（中景另带同样多的辅助图）：眼前两块、往前两块、往后一块。一块 2048×1800 要 15 MB 显存
 const TEX_LIMIT = { mid: 5, far: 4 };
 // 下载的先后（数字小的先下，createLoadQueue）：眼前的预览图和水的底色 → 眼前的中景、停着的鱼 → 眼前的远景、辅助图
-// → 游动的鱼、眼前的水母 → 前后几块的预览图 → 前后几块（同时下几张见 mountReef 里的 capacity）
-const PRIO = { viewLo: 0, view: 1, viewMore: 2, extra: 3, aheadLo: 4, ahead: 5 };
+// → 游动的鱼、眼前的水母 → 下一段（下一段不下预览图；同时下几张见 mountReef 里的 capacity）
+const PRIO = { viewLo: 0, view: 1, viewMore: 2, extra: 3, ahead: 4 };
 // 出水停下时水线在画面从上往下的哪里（清单里没写就用这个）
 const ABOVE_TO = 0.74;
 
@@ -635,13 +662,14 @@ export function mountReef(root, canvas, { onFail } = {}) {
       }
     });
   };
-  // 同时下几张（算的是一共在下的张数）：预览图小，最多六张一起；眼前的高清图、鱼两张（一起下得多，每张都分不到多少带宽，
-  // 鱼和眼前那块都来得晚）；往前备的预览图三张；往前备的高清图只在别的都下完了才开始，一次一张，眼前的随时有位子。
-  // 滚过去 1.5 秒还没下完的停掉。
+  // 同时下几张（算的是一共在下的张数）：眼前的预览图最多八张、眼前的清楚的图和鱼最多六张、下一段的在一共不到四张在下时才开始
+  // （眼前要用的随时还有位子）。国内的线路上每张都要先等一秒多首字节，一段十来个请求：原来同时只下两三张，要排四五轮、
+  // 每轮先空等一秒多，一段自己的图六到八秒才下完，带宽只用到六成，下一段一次都没备上（限速实测）。并发多开，等待就叠在一起。
+  // 滚过去 0.6 秒还没下完的停掉（1.5 秒时下一段的预览图要多等将近一秒）。
   const queue = createLoadQueue({
     start: fetchOne,
-    capacity: (prio) => (prio === PRIO.viewLo ? 6 : prio === PRIO.aheadLo ? 3 : prio === PRIO.ahead ? 1 : 2),
-    staleMs: 1500,
+    capacity: (prio) => (prio === PRIO.viewLo ? 8 : prio === PRIO.ahead ? 4 : 6),
+    staleMs: 600,
     clock: () => win.performance.now(),
   });
   // 已经有了、下完等着传、正在一条条传进显卡（原来漏了这一种：传的那几帧里又要了一遍，同一张图下两次）、在排队的，都不再要
@@ -667,8 +695,9 @@ export function mountReef(root, canvas, { onFail } = {}) {
       const item = ready.splice(at, 1)[0];
       if (!item) return;
       queued.delete(item.key);
-      // 已经有了；或者是预览图、而高清的已经传进去了：不用再传
-      if (textures.has(item.key) || (item.key.endsWith('-lo') && textures.has(item.key.slice(0, -3)))) {
+      // 已经有了；或者是预览图、而清楚的（哪一套都行）已经传进去了：不用再传
+      const sharpBase = item.key.endsWith('-lo') ? item.key.slice(0, -3) : null;
+      if (textures.has(item.key) || (sharpBase && (textures.has(sharpBase) || textures.has(`${sharpBase}-md`)))) {
         closeItem(item);
         return;
       }
@@ -722,52 +751,78 @@ export function mountReef(root, canvas, { onFail } = {}) {
     return t;
   };
 
+  // 用哪一套（tierOf：'' 是原图，'-md' 是半分辨率的），每帧量过画布以后在 want 里定
+  let tierNow = '';
+  const otherTier = () => (tierNow ? '' : '-md');
   const tileKey = (layer, i, aux = false) => `${layer}:${String(i).padStart(2, '0')}${aux ? '-aux' : ''}`;
+  const sharpKey = (layer, i, tier) => `${tileKey(layer, i)}${tier}`;
+  const auxKey = (layer, i, tier) => `${tileKey(layer, i, true)}${tier}`;
+  // 辅助图也分两套（半分辨率那套的辅助图 512×450），哪套到了用哪套
+  const auxTex = (layer, i) => tex(auxKey(layer, i, tierNow)) || tex(auxKey(layer, i, otherTier()));
   const loKey = (layer, i) => `${tileKey(layer, i)}-lo`;
   const tileFile = (layer, i, suffix = '') => `${layer}/${String(i).padStart(2, '0')}${suffix}.webp`;
-  // 这一块现在拿什么画：高清的到了用高清的，没到先用预览图
-  const tileTex = (layer, i) => tex(tileKey(layer, i)) || tex(loKey(layer, i));
+  // 这一块现在拿什么画：这一套清楚的到了用它，没到先拿另一套清楚的（窗口刚改过大小时），再没有用预览图
+  const tileTex = (layer, i) => tex(sharpKey(layer, i, tierNow)) || tex(sharpKey(layer, i, otherTier())) || tex(loKey(layer, i));
+  // 鱼、水母的图集也分两套（半分辨率的是四分之三大小），格子数一样
+  const sprite = (name) => tex(`${name}${tierNow}`) || tex(`${name}${otherTier()}`);
   request('back', reefUrl(m, 'back.webp'), PRIO.viewLo, true);
-  request('fish:idle', reefUrl(m, 'fish/idle.webp'), PRIO.view, true);
-  request('fish:swim', reefUrl(m, 'fish/swim.webp'), PRIO.extra, true);
   queue.sweep();
   const jellies = [];
   const fishGrid = m.fish || { cols: 6, rows: 4, frames: 24, len: 0.3 };
 
   let filling = false;
   const needed = new Set();
-  // 要一块：清单说有预览图、高清的还没传进显卡时，先要预览图（四分之一大小，二三十 KB）；高清的到了就把预览图删掉
+  // 要一块：清单说有预览图、清楚的还没传进显卡时，眼前的先要预览图（四分之一大小，二三十 KB）；清楚的到了就把预览图删掉。
+  // 下一段的（view 为 false）不要预览图，直接要清楚的：一段的预览图要 0.12 MB，国内线路上将近一秒的带宽，访客停着读字时够把清楚的备好。
+  // 清楚的按 tierNow 要原图或半分辨率的（辅助图也一样）；另一套（窗口改过大小以前下的）先留着顶上，这一套到了再删。
   const ask = (name, i, view, keep) => {
     const layer = m.layers[name];
-    const key = tileKey(name, i);
+    const key = sharpKey(name, i, tierNow);
+    const other = sharpKey(name, i, otherTier());
     keep.add(key);
+    if (textures.has(key)) drop(other);
+    else if (textures.has(other)) keep.add(other);
     if (m.preview) {
       const lo = loKey(name, i);
-      if (textures.has(key)) drop(lo);
+      if (textures.has(key) || textures.has(other)) drop(lo);
       else {
         keep.add(lo);
-        if (view) needed.add(lo);
-        request(lo, reefUrl(m, tileFile(name, i, '-lo')), view ? PRIO.viewLo : PRIO.aheadLo);
+        if (view) {
+          needed.add(lo);
+          request(lo, reefUrl(m, tileFile(name, i, '-lo')), PRIO.viewLo);
+        }
       }
     }
     if (view) needed.add(key);
-    request(key, reefUrl(m, tileFile(name, i)), view ? (name === 'mid' ? PRIO.view : PRIO.viewMore) : PRIO.ahead);
+    request(key, reefUrl(m, tileFile(name, i, tierNow)), view ? (name === 'mid' ? PRIO.view : PRIO.viewMore) : PRIO.ahead);
     if (layer.aux) {
-      const aux = tileKey(name, i, true);
+      const aux = auxKey(name, i, tierNow);
+      const auxOther = auxKey(name, i, otherTier());
       keep.add(aux);
+      if (textures.has(aux)) drop(auxOther);
+      else if (textures.has(auxOther)) keep.add(auxOther);
       if (view) needed.add(aux);
-      request(aux, reefUrl(m, tileFile(name, i, '-aux')), view ? PRIO.viewMore : PRIO.ahead);
+      request(aux, reefUrl(m, tileFile(name, i, `-aux${tierNow}`)), view ? PRIO.viewMore : PRIO.ahead);
     }
   };
+  // 往滚动的方向，下一个停点在哪（滚轮一下走一段，停点是确定的：stopXs）；到头了是 null
+  const stops = stopXs(m);
+  const nextStop = (camX, dir) => (dir >= 0 ? stops.find((x) => x > camX + 0.3) : [...stops].reverse().find((x) => x < camX - 0.3)) ?? null;
   const want = (camX, aspect, dir) => {
+    tierNow = tierOf(m, canvas.height);
     needed.clear();
     queue.begin();
+    // 鱼：停着的那套和眼前的图一起先下；游动的那套和下一段同一级（没到时拿停着的顶上，不跟前几段抢带宽）。画布量过尺寸以后才知道要哪一套，所以放在这里要
+    request(`fish:idle${tierNow}`, reefUrl(m, `fish/idle${tierNow}.webp`), PRIO.view, true);
+    request(`fish:swim${tierNow}`, reefUrl(m, `fish/swim${tierNow}.webp`), PRIO.ahead, true);
+    // 访客真的滚进来了（filling）：把下一段整段备好（aheadTiles），访客停在这一段读字的时候下，滚过去就是清楚的
+    const nextX = filling ? nextStop(camX, dir) : null;
     for (const name of ['far', 'mid']) {
       const layer = m.layers[name];
       const keep = new Set();
       const [a, b] = visibleTiles(layer, camX, aspect, m.viewH);
       for (let i = a; i <= b; i++) ask(name, i, true, keep);
-      if (filling) for (const i of dir >= 0 ? [b + 1, b + 2, a - 1] : [a - 1, a - 2, b + 1]) if (i >= 0 && i < layer.tiles) ask(name, i, false, keep);
+      for (const i of aheadTiles(layer, camX, nextX, aspect, m.viewH)) if (i >= 0 && i < layer.tiles) ask(name, i, false, keep);
       evict(`${name}:`, keep, TEX_LIMIT[name] * (layer.aux ? 2 : 1));
     }
     const above = m.layers.above;
@@ -776,14 +831,16 @@ export function mountReef(root, canvas, { onFail } = {}) {
       if (aboveAt(camX + 1.2, m) > 0) {
         const [a, b] = visibleTiles(above, camX, aspect, m.viewH);
         for (let i = a; i <= b; i++) ask('above', i, true, keep);
-      } else if (filling && camX > m.xEnd - m.sceneLen) {
-        for (let i = 0; i < above.tiles; i++) ask('above', i, false, keep);
+      } else if (nextX === m.xEnd) {
+        const [a, b] = visibleTiles(above, nextX, aspect, m.viewH);
+        for (let i = a; i <= b; i++) ask('above', i, false, keep);
       }
     }
-    // 水母只在深水那一段：快到了才下（原来一挂上就下，555 KB 跟眼前那块抢带宽）
+    // 水母只在深水那一段：到了、或者下一段就是才下（原来一挂上就下，555 KB 跟眼前那块抢带宽）
     if (m.jelly) {
-      if (effectsAt(camX, m).jelly > 0.02) request('jelly', reefUrl(m, 'jelly.webp'), PRIO.extra);
-      else if (filling && effectsAt(camX + m.sceneLen, m).jelly > 0) request('jelly', reefUrl(m, 'jelly.webp'), PRIO.ahead);
+      const file = `jelly${tierNow}.webp`;
+      if (effectsAt(camX, m).jelly > 0.02) request(`jelly${tierNow}`, reefUrl(m, file), PRIO.extra);
+      else if (nextX !== null && effectsAt(nextX, m).jelly > 0.02) request(`jelly${tierNow}`, reefUrl(m, file), PRIO.ahead);
     }
     queue.sweep();
   };
@@ -974,7 +1031,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
         if (sx < -size || sx > W + size) continue;
         const phase = (time * (0.35 + 0.15 * r()) + r()) % 1;
         const alpha = eff.jelly * (0.35 + 0.55 * depth);
-        if (m.jelly && tex('jelly')) jellies.push({ x: sx, y: sy + dy, w: size * 1.1, h: size * 1.65, phase, alpha, depth });
+        if (m.jelly && sprite('jelly')) jellies.push({ x: sx, y: sy + dy, w: size * 1.1, h: size * 1.65, phase, alpha, depth });
         else put(sx, sy, size, size * 1.6, 4, phase, alpha);
       }
     }
@@ -1029,7 +1086,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
         const x1 = x0 + layer.tileM * scale;
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, t.tex);
-        const aux = layer.aux ? tex(tileKey(name, i, true)) : null;
+        const aux = layer.aux ? auxTex(name, i) : null;
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, aux ? aux.tex : blank);
         gl.uniform2f(uq.u_world, wx0, layer.tileM);
@@ -1067,9 +1124,9 @@ export function mountReef(root, canvas, { onFail } = {}) {
   };
 
   const drawFish = (pose, water, above, dy) => {
-    const idle = tex('fish:idle');
+    const idle = sprite('fish:idle');
     // 游动的那套还没下完时先拿停着的那套顶上（国内慢的线路上鱼能早一点出来）
-    const swim = tex('fish:swim') || idle;
+    const swim = sprite('fish:swim') || idle;
     if (!idle) return;
     const W = canvas.width;
     const H = canvas.height;
@@ -1109,7 +1166,7 @@ export function mountReef(root, canvas, { onFail } = {}) {
 
   // 水母的序列帧：远的先画，近的后画
   const drawJellies = () => {
-    const t = tex('jelly');
+    const t = sprite('jelly');
     if (!t || !jellies.length) return;
     const W = canvas.width;
     const H = canvas.height;
